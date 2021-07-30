@@ -134,6 +134,9 @@ func TestFloat64ToFloatX80(t *testing.T) {
 			if got := Float64ToFloatX80(tt.a); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Float64ToFloatX80() = %v, want %v", got, tt.want)
 			}
+			if got := Float32ToFloatX80(float32(tt.a)); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Float32ToFloatX80() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

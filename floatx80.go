@@ -1,6 +1,8 @@
 package float
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/bits"
@@ -81,8 +83,33 @@ func Raise(x int) {
 	// Do not use global var
 }
 
-func (a X80) String() string {
-	return fmt.Sprintf("%04X%016X", a.high, a.low)
+// Returns the result of converting the double-precision floating-point value
+// `a' to the extended double-precision floating-point format.  The conversion
+// is performed according to the IEC/IEEE Standard for Binary Floating-Point
+// Arithmetic.
+func NewFromFloat64(a float64) X80 {
+	return Float64ToFloatX80(a)
+}
+
+// Returns a byte array in byte order LittleEndian or BigEndian of
+// an extended double precision float
+func (a X80) Bytes(order binary.ByteOrder) []byte {
+	buf := new(bytes.Buffer)
+	if err := binary.Write(buf, order, a); err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
+// Returns a new extended double precision float from a byte array in
+// byte order LittleEndian or BigEndian
+func NewFromBytes(b []byte, order binary.ByteOrder) X80 {
+	buf := bytes.NewReader(b)
+	var result X80
+	if err := binary.Read(buf, order, result); err != nil {
+		panic(err)
+	}
+	return result
 }
 
 // Returns the faction bits

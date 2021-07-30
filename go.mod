@@ -1,3 +1,3 @@
-module github.com/jenska/floatx80
+module github.com/jenska/float
 
 go 1.16
