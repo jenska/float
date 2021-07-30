@@ -515,10 +515,7 @@ func roundAndPackInt64(zSign bool, absZ0, absZ1 uint64) int64 {
 // than the desired result exponent whenever `zSig' is a complete, normalized
 // significand.
 func packFloat64(zSign bool, zExp int16, zSig uint64) float64 {
-	if zSign {
-		return math.Float64frombits(1<<63 + uint64(zExp)<<52 + zSig)
-	}
-	return math.Float64frombits(uint64(zExp)<<52 + zSig)
+	return math.Float64frombits(x1(zSign)<<63 + uint64(zExp)<<52 + zSig)
 }
 
 // Takes an abstract floating-point value having sign `zSign', exponent `zExp',
@@ -583,7 +580,7 @@ func roundAndPackFloat64(zSign bool, zExp int16, zSig uint64) float64 {
 	if roundBits != 0 {
 		Raise(ExceptionInexact)
 	}
-	zSig = uint64(int64(zSig) + roundIncrement>>10)
+	zSig = uint64(int64(zSig)+roundIncrement) >> 10
 	if (roundBits^0x200) == 0 && roundNearestEven {
 		zSig &= uint64(1)
 	}

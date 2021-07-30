@@ -209,9 +209,7 @@ func (a X80) ToFloat32() float32 {
 // conversion is performed according to the IEC/IEEE Standard for Binary
 // Floating-Point Arithmetic.
 func (a X80) ToFloat64() float64 {
-	aSig := a.frac()
-	aExp := a.exp()
-	aSign := a.sign()
+	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	if aExp == 0x7FFF {
 		if aSig<<1 != 0 {
 			return math.NaN()

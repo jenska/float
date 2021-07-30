@@ -134,8 +134,31 @@ func TestFloat64ToFloatX80(t *testing.T) {
 			if got := Float64ToFloatX80(tt.a); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Float64ToFloatX80() = %v, want %v", got, tt.want)
 			}
-			if got := Float32ToFloatX80(float32(tt.a)); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Float32ToFloatX80() = %v, want %v", got, tt.want)
+		})
+	}
+}
+
+func TestX80_ToFloat64(t *testing.T) {
+	tests := []struct {
+		name string
+		want float64
+	}{
+		{"1", 1.0},
+		{"0", 0.0},
+		{"pi", math.Pi},
+		{"-1", -1.0},
+		{"0.5", 0.5},
+		{"-0.5", -0.5},
+		{"0.123", 0.123},
+		{"-0.123", -0.123},
+		//	{"NaN", math.NaN()},
+		{"Inf+", math.Inf(1)},
+		{"Inf-", math.Inf(-1)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Float64ToFloatX80(tt.want); got.ToFloat64() != tt.want {
+				t.Errorf("X80.ToFloat64() = %v, want %v (X80: %v)", got.ToFloat64(), tt.want, got)
 			}
 		})
 	}

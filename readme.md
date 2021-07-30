@@ -3,7 +3,7 @@
 The float package is a software implementation of floating-point arithmetics that conforms to
 the 80-bit IEEE 754 extended double precision floating-point format
 
-This package is derived from the original SoftFloat package and was implemented as a basis for an m68881/m68882 eumlation in pure Go
+This package is derived from the original SoftFloat package and was implemented as a basis for a Motorola M68881/M68882 FPU emulation in pure Go
 
 ## Example
 
@@ -12,7 +12,7 @@ package float_test
 
 import (
 	"fmt"
-     "github.com/jenska/float"
+    "github.com/jenska/float"
 )
 
 func ExampleX80() {
