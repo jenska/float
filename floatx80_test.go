@@ -11,6 +11,6 @@ func ExampleX80() {
 	pi2 := pi.Add(pi)
 	sqrtpi2 := pi2.Sqrt()
 	epsilon := sqrtpi2.Mul(sqrtpi2).Sub(pi2)
-	fmt.Println(epsilon.Internal())
-	// Output: BFC28000000000000000
+	fmt.Println(epsilon)
+	// Output: -0.000000000000000000433680868994
 }

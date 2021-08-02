@@ -5,7 +5,7 @@ import (
 	"math/bits"
 )
 
-// Returns the result of converting the 32-bit two's complement integer `a'
+// Int32ToFloatX80 returns the result of converting the 32-bit two's complement integer `a'
 // to the extended double-precision floating-point format.  The conversion
 // is performed according to the IEC/IEEE Standard for Binary Floating-Point
 // Arithmetic.
@@ -19,9 +19,13 @@ func Int32ToFloatX80(a int32) X80 {
 		absA = -a
 	}
 	shiftCount := bits.LeadingZeros32(uint32(absA)) + 32
-	return packFloatX80(zSign, 0x403E-int32(shiftCount), uint64(absA)<<shiftCount)
+	return packFloatX80(zSign, 0x403E-shiftCount, uint64(absA)<<shiftCount)
 }
 
+// Int64ToFloatX80 returns the result of converting the 64-bit two's complement integer `a'
+// to the extended double-precision floating-point format.  The conversion
+// is performed according to the IEC/IEEE Standard for Binary Floating-Point
+// Arithmetic.
 func Int64ToFloatX80(a int64) X80 {
 	if a == 0 {
 		return X80Zero
@@ -32,10 +36,10 @@ func Int64ToFloatX80(a int64) X80 {
 		absA = -a
 	}
 	shiftCount := bits.LeadingZeros64(uint64(absA))
-	return packFloatX80(zSign, 0x403E-int32(shiftCount), uint64(absA)<<shiftCount)
+	return packFloatX80(zSign, 0x403E-shiftCount, uint64(absA)<<shiftCount)
 }
 
-// Returns the result of converting the single-precision floating-point value
+// Float32ToFloatX80 returns the result of converting the single-precision floating-point value
 // `a' to the extended double-precision floating-point format.  The conversion
 // is performed according to the IEC/IEEE Standard for Binary Floating-Point
 // Arithmetic.
@@ -43,14 +47,14 @@ func Float32ToFloatX80(a float32) X80 {
 	return Float64ToFloatX80(float64(a))
 }
 
-// Returns the result of converting the double-precision floating-point value
+// Float64ToFloatX80 returns the result of converting the double-precision floating-point value
 // `a' to the extended double-precision floating-point format.  The conversion
 // is performed according to the IEC/IEEE Standard for Binary Floating-Point
 // Arithmetic.
 func Float64ToFloatX80(a float64) X80 {
 	b := math.Float64bits(a)
 	aSig := b & 0x000FFFFFFFFFFFFF
-	aExp := int32((b >> 52) & 0x7FF)
+	aExp := int((b >> 52) & 0x7FF)
 	aSign := b>>63 != 0
 	if aExp == 0x7FF {
 		if aSig != 0 {
@@ -63,12 +67,12 @@ func Float64ToFloatX80(a float64) X80 {
 			return packFloatX80(aSign, 0, 0)
 		}
 		shiftCount := bits.LeadingZeros64(aSig) - 11
-		aExp, aSig = int32(1-shiftCount), aSig<<shiftCount
+		aExp, aSig = 1-shiftCount, aSig<<shiftCount
 	}
 	return packFloatX80(aSign, aExp+0x3C00, (aSig|0x0010000000000000)<<11)
 }
 
-// Returns the result of converting the extended double-precision floating-
+// ToInt32 returns the result of converting the extended double-precision floating-
 // point value `a' to the 32-bit two's complement integer format.  The
 // conversion is performed according to the IEC/IEEE Standard for Binary
 // Floating-Point Arithmetic---which means in particular that the conversion
@@ -90,7 +94,7 @@ func (a X80) ToInt32() int32 {
 	return roundAndPackInt32(aSign, aSig)
 }
 
-// Returns the result of converting the extended double-precision floating-
+// ToInt32RoundZero returns the result of converting the extended double-precision floating-
 // point value `a' to the 32-bit two's complement integer format.  The
 // conversion is performed according to the IEC/IEEE Standard for Binary
 // Floating-Point Arithmetic, except that the conversion is always rounded
@@ -137,7 +141,7 @@ func (a X80) ToInt32RoundZero() int32 {
 	return z
 }
 
-// Returns the result of converting the extended double-precision floating-
+// ToInt64 returns the result of converting the extended double-precision floating-
 // point value `a' to the 64-bit two's complement integer format.  The
 // conversion is performed according to the IEC/IEEE Standard for Binary
 // Floating-Point Arithmetic---which means in particular that the conversion
@@ -156,14 +160,13 @@ func (a X80) ToInt64() int64 {
 			return math.MaxInt64
 		}
 		return math.MinInt64
-	} else {
-		aSig, aSigExtra = shift64ExtraRightJamming(aSig, 0, int16(shiftCount))
 	}
+	aSig, aSigExtra = shift64ExtraRightJamming(aSig, 0, int16(shiftCount))
 	return roundAndPackInt64(aSign, aSig, aSigExtra)
 }
 
-// Returns the result of converting the extended double-precision floating-
-// point value `a' to the 64-bit two's complement integer format.  The
+// ToInt64RoundZero returns the result of converting the extended double-precision
+// floating-point value `a' to the 64-bit two's complement integer format.  The
 // conversion is performed according to the IEC/IEEE Standard for Binary
 // Floating-Point Arithmetic, except that the conversion is always rounded
 // toward zero.  If `a' is a NaN, the largest positive integer is returned.
@@ -199,12 +202,15 @@ func (a X80) ToInt64RoundZero() int64 {
 	return z
 }
 
-// Software IEC/IEEE extended double-precision conversion routines.
+// ToFloat32 returns the result of converting the extended double-precision floating-
+// point value `a' to the double-precision floating-point format.  The
+// conversion is performed according to the IEC/IEEE Standard for Binary
+// Floating-Point Arithmetic.
 func (a X80) ToFloat32() float32 {
 	return float32(a.ToFloat64())
 }
 
-// Returns the result of converting the extended double-precision floating-
+// ToFloat64 returns the result of converting the extended double-precision floating-
 // point value `a' to the double-precision floating-point format.  The
 // conversion is performed according to the IEC/IEEE Standard for Binary
 // Floating-Point Arithmetic.

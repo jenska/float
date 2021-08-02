@@ -11,29 +11,27 @@ This package is derived from the original SoftFloat package and was implemented 
 package float_test
 
 import (
-	"fmt"
+    "fmt"
     "github.com/jenska/float"
 )
 
 func ExampleX80() {
-	pi := float.X80Pi
-	pi2 := pi.Add(pi)
-	sqrtpi2 := pi2.Sqrt()
-	epsilon := sqrtpi2.Mul(sqrtpi2).Sub(pi2)
-	fmt.Println(epsilon.Internal())
-	// Output: BFC28000000000000000
+    pi := float.X80Pi
+    pi2 := pi.Add(pi)
+    sqrtpi2 := pi2.Sqrt()
+    epsilon := sqrtpi2.Mul(sqrtpi2).Sub(pi2)
+    fmt.Println(epsilon)
+    // Output: -0.000000000000000000433680868994
 }
-
 ```
 
 ## Error Handling
 
 ### TODOs
+
 - improve test coverage
 - add examples
 - improve error handling
-- print and scan routines
 - log/ln operations
 - atan
 - benchmarks
-- extend to 128-bit IEEE 754 

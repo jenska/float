@@ -10,6 +10,7 @@ import (
 )
 
 type (
+	// X80 represents the 80-bit extended double precision floating-point type
 	X80 struct {
 		// Sign and exponent.
 		//
@@ -30,7 +31,7 @@ const (
 	TininessBeforeRounding = 1
 )
 
-// Software IEC/IEEE floating-point underflow tininess-detection mode.
+// DetectTininess tininess-detection mode.
 var DetectTininess = TininessAfterRounding
 
 // Software IEC/IEEE floating-point rounding mode.
@@ -41,7 +42,7 @@ const (
 	RoundUp          = 3
 )
 
-// Software IEC/IEEE floating-point rounding mode.
+// RoundingMode Software IEC/IEEE floating-point rounding mode.
 var RoundingMode = RoundNearestEven
 
 // Software IEC/IEEE floating-point exception flags.
@@ -54,10 +55,10 @@ const (
 	ExceptionInexact   = 0x20
 )
 
-// Software IEC/IEEE floating-point exception flags.
+// Exception Software IEC/IEEE floating-point exception flags.
 var Exception int = 0
 
-// Software IEC/IEEE extended double-precision rounding precision.  Valid
+// RoundingPrecision Software IEC/IEEE extended double-precision rounding precision.  Valid
 // values are 32, 64, and 80.
 var RoundingPrecision = 80
 
@@ -76,14 +77,14 @@ var (
 	X80NaN      = newFromHexString("7FFFC000000000000000") // NaN
 )
 
-// Routine to raise any or all of the software IEC/IEEE floating-point exception flags.
+// Raise any or all of the software IEC/IEEE floating-point exception flags.
 func Raise(x int) {
 	Exception |= x
 	// TODO: callback if Exception!=0
 	// Do not use global var
 }
 
-// Returns the result of converting the double-precision floating-point value
+// NewFromFloat64 returns the result of converting the double-precision floating-point value
 // `a' to the extended double-precision floating-point format.  The conversion
 // is performed according to the IEC/IEEE Standard for Binary Floating-Point
 // Arithmetic.
@@ -91,7 +92,7 @@ func NewFromFloat64(a float64) X80 {
 	return Float64ToFloatX80(a)
 }
 
-// Returns a byte array in byte order LittleEndian or BigEndian of
+// Bytes returns a byte array in byte order LittleEndian or BigEndian of
 // an extended double precision float
 func (a X80) Bytes(order binary.ByteOrder) []byte {
 	buf := new(bytes.Buffer)
@@ -101,7 +102,7 @@ func (a X80) Bytes(order binary.ByteOrder) []byte {
 	return buf.Bytes()
 }
 
-// Returns a new extended double precision float from a byte array in
+// NewFromBytes returns a new extended double precision float from a byte array in
 // byte order LittleEndian or BigEndian
 func NewFromBytes(b []byte, order binary.ByteOrder) X80 {
 	buf := bytes.NewReader(b)
@@ -118,8 +119,8 @@ func (a X80) frac() uint64 {
 }
 
 // Returns the exponent bits
-func (a X80) exp() int32 {
-	return int32(a.high & 0x7fff)
+func (a X80) exp() int {
+	return int(a.high & 0x7fff)
 }
 
 // Returns true if value is negative, false otherwise
@@ -162,17 +163,16 @@ func propagateFloatX80NaN(a, b X80) X80 {
 			return b
 		}
 		return a
-	} else {
-		return b
 	}
+	return b
 }
 
-// Returns true if the value is NaN, otherwise false
+// IsNaN returns true if the value is NaN, otherwise false
 func (a X80) IsNaN() bool {
 	return (a.high&0x7fff) == 0x7fff && a.low<<1 != 0
 }
 
-// Returns true of the value is a signaling NaN, otherwise false
+// IsSignalingNaN returns true of the value is a signaling NaN, otherwise false
 func (a X80) IsSignalingNaN() bool {
 	aLow := a.low & ^uint64(0x4000000000000000)
 	return (a.high&0x7fff) == 0x7fff && aLow<<1 != 0 && a.low == aLow
@@ -199,7 +199,7 @@ func (a X80) IsSignalingNaN() bool {
 // returned is a subnormal number, and it must not require rounding.  The
 // handling of underflow and overflow follows the IEC/IEEE Standard for Binary
 // Floating-Point Arithmetic.
-func roundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int32, zSig0, zSig1 uint64) X80 {
+func roundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zSig1 uint64) X80 {
 	roundingMode := RoundingMode
 	roundNearestEven := roundingMode == RoundNearestEven
 
@@ -362,7 +362,7 @@ func roundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int32, zSig0, 
 
 // Packs the sign `zSign', exponent `zExp', and significand `zSig' into an
 // extended double-precision floating-point value, returning the result.
-func packFloatX80(zSign bool, zExp int32, zSig uint64) X80 {
+func packFloatX80(zSign bool, zExp int, zSig uint64) X80 {
 	high := uint16(zExp)
 	if zSign {
 		high += 1 << 15
@@ -379,7 +379,7 @@ func packFloatX80(zSign bool, zExp int32, zSig uint64) X80 {
 //corresponding to the abstract input.  This routine is just like
 //`roundAndPackFloatx80' except that the input significand does not have to be
 // normalized.
-func normalizeRoundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int32, zSig0, zSig1 uint64) X80 {
+func normalizeRoundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zSig1 uint64) X80 {
 	if zSig0 == 0 {
 		zSig0 = zSig1
 		zSig1 = 0
@@ -387,16 +387,16 @@ func normalizeRoundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int32
 	}
 	shiftCount := bits.LeadingZeros64(zSig0)
 	zSig0, zSig1 = shortShift128Left(zSig0, zSig1, int16(shiftCount))
-	zExp -= int32(shiftCount)
+	zExp -= shiftCount
 	return roundAndPackFloatX80(roundingPrecision, zSign, zExp, zSig0, zSig1)
 }
 
 // Normalizes the subnormal extended double-precision floating-point value
 // represented by the denormalized significand `aSig'.
-func normalizeFloatX80Subnormal(aSig uint64) (zExp int32, zSig uint64) {
+func normalizeFloatX80Subnormal(aSig uint64) (zExp int, zSig uint64) {
 	shiftCount := bits.LeadingZeros64(aSig)
 	zSig = aSig << shiftCount
-	zExp = 1 - int32(shiftCount)
+	zExp = 1 - shiftCount
 	return
 }
 

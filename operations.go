@@ -1,6 +1,6 @@
 package float
 
-// Rounds the extended double-precision floating-point value `a' to an integer,
+// RoundToInt rounds the extended double-precision floating-point value `a' to an integer,
 // and returns the result as an extended quadruple-precision floating-point
 //value.  The operation is performed according to the IEC/IEEE Standard for
 // Binary Floating-Point Arithmetic.
@@ -61,26 +61,27 @@ func (a X80) RoundToInt() X80 {
 	return z
 }
 
-// Returns the result of adding the extended double-precision floating-point
+// Add returns the result of adding the extended double-precision floating-point
 // values `a' and `b'.  The operation is performed according to the IEC/IEEE
 // Standard for Binary Floating-Point Arithmetic.
 func (a X80) Add(b X80) X80 {
-	if aSign, bSign := a.sign(), b.sign(); aSign == bSign {
+	aSign, bSign := a.sign(), b.sign()
+	if aSign == bSign {
 		return addFloatx80Sigs(a, b, aSign)
-	} else {
-		return subFloatx80Sigs(a, b, aSign)
 	}
+	return subFloatx80Sigs(a, b, aSign)
 }
 
-// Returns the result of subtracting the extended double-precision floating-
+// Sub returns the result of subtracting the extended double-precision floating-
 // point values `a' and `b'.  The operation is performed according to the
 // IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 func (a X80) Sub(b X80) X80 {
-	if aSign, bSign := a.sign(), b.sign(); aSign == bSign {
+	aSign, bSign := a.sign(), b.sign()
+	if aSign == bSign {
 		return subFloatx80Sigs(a, b, aSign)
-	} else {
-		return addFloatx80Sigs(a, b, aSign)
 	}
+	return addFloatx80Sigs(a, b, aSign)
+
 }
 
 // Returns the result of adding the absolute values of the extended double-
@@ -92,7 +93,7 @@ func addFloatx80Sigs(a, b X80, zSign bool) X80 {
 	aSig, bSig := a.frac(), b.frac()
 	aExp, bExp := a.exp(), b.exp()
 	var zSig0, zSig1 uint64
-	var zExp int32
+	var zExp int
 	expDiff := aExp - bExp
 	if 0 < expDiff {
 		if aExp == 0x7FFF {
@@ -154,7 +155,7 @@ func subFloatx80Sigs(a, b X80, zSign bool) X80 {
 	aSig, bSig := a.frac(), b.frac()
 	aExp, bExp := a.exp(), b.exp()
 	var zSig0, zSig1 uint64
-	var zExp int32
+	var zExp int
 	expDiff := aExp - bExp
 
 	if 0 < expDiff {
@@ -217,7 +218,7 @@ normalizeRoundAndPack:
 
 }
 
-// Returns the result of multiplying the extended double-precision floating-
+// Mul returns the result of multiplying the extended double-precision floating-
 // point values `a' and `b'.  The operation is performed according to the
 // IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 func (a X80) Mul(b X80) X80 {
@@ -267,7 +268,7 @@ func (a X80) Mul(b X80) X80 {
 	return roundAndPackFloatX80(RoundingPrecision, zSign, zExp, zSig0, zSig1)
 }
 
-// Returns the result of dividing the extended double-precision floating-point
+// Div returns the result of dividing the extended double-precision floating-point
 // value `a' by the corresponding value `b'.  The operation is performed
 // according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 func (a X80) Div(b X80) X80 {
@@ -338,7 +339,7 @@ func (a X80) Div(b X80) X80 {
 	return roundAndPackFloatX80(RoundingPrecision, zSign, zExp, zSig0, zSig1)
 }
 
-// Returns the remainder of the extended double-precision floating-point value
+// Rem returns the remainder of the extended double-precision floating-point value
 // `a' with respect to the corresponding value `b'.  The operation is performed
 // according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 func (a X80) Rem(b X80) X80 {
@@ -430,7 +431,7 @@ func (a X80) Rem(b X80) X80 {
 	return normalizeRoundAndPackFloatX80(80, zSign, bExp+expDiff, aSig0, aSig1)
 }
 
-// Returns the square root of the extended double-precision floating-point
+// Sqrt returns the square root of the extended double-precision floating-point
 // value `a'.  The operation is performed according to the IEC/IEEE Standard
 // for Binary Floating-Point Arithmetic.
 func (a X80) Sqrt() X80 {
@@ -460,7 +461,7 @@ func (a X80) Sqrt() X80 {
 		aExp, aSig0 = normalizeFloatX80Subnormal(aSig0)
 	}
 	zExp := ((aExp - 0x3FFF) >> 1) + 0x3FFF
-	zSig0 := uint64(estimateSqrt32(aExp, uint32(aSig0>>32)))
+	zSig0 := uint64(estimateSqrt32(int32(aExp), uint32(aSig0>>32)))
 	aSig0, aSig1 = shift128Right(aSig0, 0, int16(2+(aExp&1)))
 	zSig0 = estimateDiv128To64(aSig0, aSig1, zSig0<<32) + (zSig0 << 30)
 	doubleZSig0 := zSig0 << 1
@@ -494,28 +495,4 @@ func (a X80) Sqrt() X80 {
 	zSig0, zSig1 = shortShift128Left(0, zSig1, 1)
 	zSig0 |= doubleZSig0
 	return roundAndPackFloatX80(RoundingPrecision, false, zExp, zSig0, zSig1)
-}
-
-// Software IEC/IEEE extended double-precision operations.
-func (a X80) Lognp1() X80 {
-	// TODO
-	panic("not implemented")
-}
-
-// Software IEC/IEEE extended double-precision operations.
-func (a X80) Logn() X80 {
-	// TODO
-	panic("not implemented")
-}
-
-// Software IEC/IEEE extended double-precision operations.
-func (a X80) Log2() X80 {
-	// TODO
-	panic("not implemented")
-}
-
-// Software IEC/IEEE extended double-precision operations.
-func (a X80) Log10() X80 {
-	// TODO
-	panic("not implemented")
 }
