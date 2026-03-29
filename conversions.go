@@ -179,20 +179,21 @@ func (a X80) ToInt64RoundZero() int64 {
 	shiftCount := aExp - 0x403E
 	if 0 <= shiftCount {
 		aSig &= math.MaxInt64
-		if a.high != 0xC03E || aSig != 0 {
-			Raise(ExceptionInvalid)
-			if !aSign || ((aExp == 0x7FFF) && aSig != 0) {
-				return math.MaxInt64
-			}
+		if a.high == 0xC03E && aSig == 0 {
+			return math.MinInt64
 		}
-		return math.MaxInt64
+		Raise(ExceptionInvalid)
+		if !aSign || ((aExp == 0x7FFF) && aSig != 0) {
+			return math.MaxInt64
+		}
+		return math.MinInt64
 	} else if aExp < 0x3FFF {
 		if aExp != 0 || aSig != 0 {
 			Raise(ExceptionInexact)
 		}
 		return 0
 	}
-	z := int64(aSig) >> (-shiftCount)
+	z := int64(aSig >> (-shiftCount))
 	if uint64(aSig<<(shiftCount&63)) != 0 {
 		Raise(ExceptionInexact)
 	}

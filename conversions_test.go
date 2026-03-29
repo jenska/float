@@ -79,6 +79,29 @@ func TestX80_ToInt64(t *testing.T) {
 	}
 }
 
+func TestX80_ToInt64RoundZero(t *testing.T) {
+	tests := []struct {
+		name string
+		a    X80
+		want int64
+	}{
+		{"zero", X80Zero, 0},
+		{"1", X80One, 1},
+		{"-1", X80MinusOne, -1},
+		{"exact min int64", newFromHexString("C03E8000000000000000"), math.MinInt64},
+		{"positive overflow", X80InfPos, math.MaxInt64},
+		{"negative overflow", newFromHexString("C03F8000000000000000"), math.MinInt64},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := tt.a
+			if got := a.ToInt64RoundZero(); got != tt.want {
+				t.Errorf("X80.ToInt64RoundZero() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestInt64ToFloatX80(t *testing.T) {
 	tests := []struct {
 		name string

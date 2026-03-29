@@ -116,7 +116,7 @@ func main() {
 ## Features
 
 - **Full IEEE 754 Compliance**: Proper handling of 80-bit extended precision
-- **Complete Arithmetic Operations**: Add, Sub, Mul, Div, Rem, Sqrt, Ln, Atan
+- **Complete Arithmetic Operations**: Add, Sub, Mul, Div, Rem, Sqrt, Ln, Atan, Sin, Cos, Tan
 - **Type Conversions**: To/from int32, int64, float32, float64
 - **String Formatting**: Binary, decimal, and hexadecimal representations
 - **Exception Handling**: IEEE 754 exception flags with customizable handlers
@@ -217,6 +217,9 @@ type X80 struct {
 - `Sqrt() X80` - Square root
 - `Ln() X80` - Natural logarithm
 - `Atan() X80` - Arctangent
+- `Sin() X80` - Sine
+- `Cos() X80` - Cosine
+- `Tan() X80` - Tangent
 
 #### Comparison Operations
 - `Eq(b X80) bool` - Equal
@@ -227,7 +230,9 @@ type X80 struct {
 
 #### Conversion Operations
 - `ToInt32() int32` - Convert to 32-bit integer
+- `ToInt32RoundZero() int32` - Convert to 32-bit integer with round-toward-zero semantics
 - `ToInt64() int64` - Convert to 64-bit integer
+- `ToInt64RoundZero() int64` - Convert to 64-bit integer with round-toward-zero semantics
 - `ToFloat32() float32` - Convert to 32-bit float
 - `ToFloat64() float64` - Convert to 64-bit float
 - `String() string` - Convert to decimal string

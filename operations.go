@@ -1,5 +1,7 @@
 package float
 
+import "math"
+
 // RoundToInt rounds the extended double-precision floating-point value `a' to an integer,
 // and returns the result as an extended quadruple-precision floating-point
 // value.  The operation is performed according to the IEC/IEEE Standard for
@@ -588,4 +590,28 @@ func (a X80) Atan() X80 {
 	}
 
 	return result
+}
+
+// Sin returns the sine of the extended double-precision floating-point value `a'.
+func (a X80) Sin() X80 {
+	if a.IsNaN() {
+		return X80NaN
+	}
+	return Float64ToFloatX80(math.Sin(a.ToFloat64()))
+}
+
+// Cos returns the cosine of the extended double-precision floating-point value `a'.
+func (a X80) Cos() X80 {
+	if a.IsNaN() {
+		return X80NaN
+	}
+	return Float64ToFloatX80(math.Cos(a.ToFloat64()))
+}
+
+// Tan returns the tangent of the extended double-precision floating-point value `a'.
+func (a X80) Tan() X80 {
+	if a.IsNaN() {
+		return X80NaN
+	}
+	return Float64ToFloatX80(math.Tan(a.ToFloat64()))
 }
