@@ -1,6 +1,7 @@
 package float
 
 import (
+	"math"
 	"testing"
 )
 
@@ -162,6 +163,42 @@ func TestX80_Atan(t *testing.T) {
 		})
 	}
 }
+
+func TestX80_SinCosTan(t *testing.T) {
+	tests := []struct {
+		name    string
+		got     X80
+		want    float64
+		wantNaN bool
+	}{
+		{"sin(0)", X80Zero.Sin(), 0, false},
+		{"sin(pi/2)", X80Pi.Div(Int64ToFloatX80(2)).Sin(), 1, false},
+		{"cos(0)", X80Zero.Cos(), 1, false},
+		{"cos(pi)", X80Pi.Cos(), -1, false},
+		{"tan(0)", X80Zero.Tan(), 0, false},
+		{"tan(pi/4)", X80Pi.Div(Int64ToFloatX80(4)).Tan(), 1, false},
+		{"sin(inf)", X80InfPos.Sin(), 0, true},
+		{"cos(inf)", X80InfPos.Cos(), 0, true},
+		{"tan(inf)", X80InfPos.Tan(), 0, true},
+		{"sin(nan)", X80NaN.Sin(), 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.got.ToFloat64()
+			if tt.wantNaN {
+				if !math.IsNaN(got) {
+					t.Fatalf("%s: expected NaN, got %v", tt.name, got)
+				}
+				return
+			}
+			if math.Abs(got-tt.want) > 1e-12 {
+				t.Fatalf("%s: got %v, want %v", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestExceptionHandling(t *testing.T) {
 	// Clear any existing exceptions
 	ClearExceptions()
