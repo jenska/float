@@ -1,7 +1,7 @@
 package float
 
 // Shifts `a' right by the number of bits given in `count'.  If any nonzero
-// bits are shifted off, they are ``jammed'' into the least significant bit of
+// bits are shifted off, they are “jammed” into the least significant bit of
 // the result by setting the least significant bit to 1.  The value of `count'
 // can be arbitrarily large; in particular, if `count' is greater than 64, the
 // result will be either 0 or 1, depending on whether `a' is zero or nonzero.
@@ -66,7 +66,7 @@ func shift128Right(a0, a1 uint64, count int16) (z0, z1 uint64) {
 
 // Shifts the 128-bit value formed by concatenating `a0' and `a1' right by the
 // number of bits given in `count'.  If any nonzero bits are shifted off, they
-// are ``jammed'' into the least significant bit of the result by setting the
+// are “jammed” into the least significant bit of the result by setting the
 // least significant bit to 1.  The value of `count' can be arbitrarily large;
 // in particular, if `count' is greater than 128, the result will be either
 // 0 or 1, depending on whether the concatenation of `a0' and `a1' is zero or

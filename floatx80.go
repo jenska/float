@@ -1,3 +1,32 @@
+// Package float provides a software implementation of 80-bit IEEE 754 extended
+// double precision floating-point arithmetic.
+//
+// This package implements the X80 type which represents 80-bit extended precision
+// floating-point numbers with 1 sign bit, 15 exponent bits, and 64 mantissa bits
+// (1 integer bit + 63 fraction bits).
+//
+// The implementation is based on the SoftFloat library and provides full IEEE 754
+// compliance including proper handling of special values (NaN, infinity, denormals)
+// and exception conditions.
+//
+// Basic usage:
+//
+//	import "github.com/jenska/float"
+//
+//	// Create values
+//	a := float.X80Pi
+//	b := float.NewFromFloat64(3.14159)
+//
+//	// Perform operations
+//	sum := a.Add(b)
+//	product := a.Mul(b)
+//
+//	// Handle exceptions
+//	float.SetExceptionHandler(func(exc int) {
+//	    log.Printf("FP exception: %x", exc)
+//	})
+//
+// For more examples, see the README.md file.
 package float
 
 import (
@@ -77,11 +106,55 @@ var (
 	X80NaN      = newFromHexString("7FFFC000000000000000") // NaN
 )
 
+// ExceptionHandler is a function that gets called when a floating-point exception occurs.
+type ExceptionHandler func(exception int)
+
+// Global exception handler. Can be set by users to customize error handling.
+var exceptionHandler ExceptionHandler
+
+// SetExceptionHandler sets a custom handler for floating-point exceptions.
+// The handler function will be called whenever an exception is raised.
+// If no handler is set, exceptions are silently accumulated in the Exception variable.
+func SetExceptionHandler(handler ExceptionHandler) {
+	exceptionHandler = handler
+}
+
+// GetExceptionHandler returns the current exception handler.
+func GetExceptionHandler() ExceptionHandler {
+	return exceptionHandler
+}
+
+// ClearExceptions clears all pending exceptions.
+func ClearExceptions() {
+	Exception = 0
+}
+
+// GetExceptions returns the current exception flags.
+func GetExceptions() int {
+	return Exception
+}
+
+// HasException checks if a specific exception flag is set.
+func HasException(flag int) bool {
+	return (Exception & flag) != 0
+}
+
+// HasAnyException checks if any exception flags are set.
+func HasAnyException() bool {
+	return Exception != 0
+}
+
+// ClearException clears a specific exception flag.
+func ClearException(flag int) {
+	Exception &^= flag
+}
+
 // Raise any or all of the software IEC/IEEE floating-point exception flags.
 func Raise(x int) {
 	Exception |= x
-	// TODO: callback if Exception!=0
-	// Do not use global var
+	if exceptionHandler != nil {
+		exceptionHandler(x)
+	}
 }
 
 // NewFromFloat64 returns the result of converting the double-precision floating-point value
@@ -178,6 +251,11 @@ func (a X80) IsSignalingNaN() bool {
 	return (a.high&0x7fff) == 0x7fff && aLow<<1 != 0 && a.low == aLow
 }
 
+// IsInf returns true if the value is positive or negative infinity, otherwise false
+func (a X80) IsInf() bool {
+	return (a.high&0x7fff) == 0x7fff && a.low == 0x8000000000000000
+}
+
 // Takes an abstract floating-point value having sign `zSign', exponent `zExp',
 // and extended significand formed by the concatenation of `zSig0' and `zSig1',
 // and returns the proper extended double-precision floating-point value
@@ -190,11 +268,15 @@ func (a X80) IsSignalingNaN() bool {
 // a subnormal number, and the underflow and inexact exceptions are raised if
 // the abstract input cannot be represented exactly as a subnormal extended
 // double-precision floating-point number.
-//    If `roundingPrecision' is 32 or 64, the result is rounded to the same
+//
+//	If `roundingPrecision' is 32 or 64, the result is rounded to the same
+//
 // number of bits as single or double precision, respectively.  Otherwise, the
 // result is rounded to the full precision of the extended double-precision
 // format.
-//    The input significand must be normalized or smaller.  If the input
+//
+//	The input significand must be normalized or smaller.  If the input
+//
 // significand is not normalized, `zExp' must be 0; in that case, the result
 // returned is a subnormal number, and it must not require rounding.  The
 // handling of underflow and overflow follows the IEC/IEEE Standard for Binary
@@ -374,10 +456,10 @@ func packFloatX80(zSign bool, zExp int, zSig uint64) X80 {
 }
 
 // Takes an abstract floating-point value having sign `zSign', exponent
-//`zExp', and significand formed by the concatenation of `zSig0' and `zSig1',
+// `zExp', and significand formed by the concatenation of `zSig0' and `zSig1',
 // and returns the proper extended double-precision floating-point value
-//corresponding to the abstract input.  This routine is just like
-//`roundAndPackFloatx80' except that the input significand does not have to be
+// corresponding to the abstract input.  This routine is just like
+// `roundAndPackFloatx80' except that the input significand does not have to be
 // normalized.
 func normalizeRoundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zSig1 uint64) X80 {
 	if zSig0 == 0 {
@@ -529,12 +611,14 @@ func packFloat64(zSign bool, zExp int16, zSig uint64) float64 {
 // to a subnormal number, and the underflow and inexact exceptions are raised
 // if the abstract input cannot be represented exactly as a subnormal double-
 // precision floating-point number.
-//     The input significand `zSig' has its binary point between bits 62
+//
+//	The input significand `zSig' has its binary point between bits 62
+//
 // and 61, which is 10 bits to the left of the usual location.  This shifted
 // significand must be normalized or smaller.  If `zSig' is not normalized,
 // `zExp' must be 0; in that case, the result returned is a subnormal number,
 // and it must not require rounding.  In the usual case that `zSig' is
-// normalized, `zExp' must be 1 less than the ``true'' floating-point exponent.
+// normalized, `zExp' must be 1 less than the “true” floating-point exponent.
 // The handling of underflow and overflow follows the IEC/IEEE Standard for
 // Binary Floating-Point Arithmetic.
 func roundAndPackFloat64(zSign bool, zExp int16, zSig uint64) float64 {

@@ -2,7 +2,7 @@ package float
 
 // RoundToInt rounds the extended double-precision floating-point value `a' to an integer,
 // and returns the result as an extended quadruple-precision floating-point
-//value.  The operation is performed according to the IEC/IEEE Standard for
+// value.  The operation is performed according to the IEC/IEEE Standard for
 // Binary Floating-Point Arithmetic.
 func (a X80) RoundToInt() X80 {
 	aExp := a.exp()
@@ -495,4 +495,97 @@ func (a X80) Sqrt() X80 {
 	zSig0, zSig1 = shortShift128Left(0, zSig1, 1)
 	zSig0 |= doubleZSig0
 	return roundAndPackFloatX80(RoundingPrecision, false, zExp, zSig0, zSig1)
+}
+
+// Ln returns the natural logarithm of the extended double-precision floating-point value `a'.
+// The operation is performed using a series expansion for ln(1+x).
+func (a X80) Ln() X80 {
+	if a.IsNaN() || a.sign() {
+		Raise(ExceptionInvalid)
+		return X80NaN
+	}
+	if a.Eq(X80Zero) {
+		Raise(ExceptionDivbyzero)
+		return X80InfNeg
+	}
+	if a.Eq(X80One) {
+		return X80Zero
+	}
+	if a.IsInf() {
+		return X80InfPos
+	}
+
+	// Reduce to [1, 2)
+	exp := 0
+	x := a
+	two := newFromHexString("40008000000000000000") // 2
+	for x.Gt(two) {                                 // > 2
+		x = x.Div(two) // / 2
+		exp++
+	}
+	for x.Lt(X80One) { // < 1
+		x = x.Mul(two) // * 2
+		exp--
+	}
+
+	// Now x is in [1, 2), compute ln(x) using series ln(1+y) where y = x - 1
+	y := x.Sub(X80One)
+	result := X80Zero
+	term := y
+	sign := X80One
+	for i := 1; i <= 20; i++ {
+		result = result.Add(term.Div(Int64ToFloatX80(int64(i))).Mul(sign))
+		term = term.Mul(y)
+		sign = sign.Mul(X80MinusOne)
+	}
+
+	// Add exp * ln(2)
+	if exp != 0 {
+		result = result.Add(Int64ToFloatX80(int64(exp)).Mul(X80Ln2))
+	}
+
+	return result
+}
+
+// Atan returns the arctangent of the extended double-precision floating-point value `a'.
+// The operation is performed using a series expansion.
+func (a X80) Atan() X80 {
+	if a.IsNaN() {
+		return X80NaN
+	}
+	if a.IsInf() {
+		if a.sign() {
+			return X80Pi.Mul(X80MinusOne).Div(Int64ToFloatX80(2))
+		}
+		return X80Pi.Div(Int64ToFloatX80(2))
+	}
+
+	absA := a
+	if a.sign() {
+		absA = a.Mul(X80MinusOne)
+	}
+
+	var result X80
+	if absA.Gt(X80One) {
+		// For |x| > 1, atan(x) = pi/2 - atan(1/x)
+		invA := X80One.Div(absA)
+		result = X80Pi.Div(Int64ToFloatX80(2)).Sub(invA.Atan())
+	} else {
+		// Series: atan(x) = x - x^3/3 + x^5/5 - x^7/7 + ...
+		result = X80Zero
+		term := absA
+		x2 := absA.Mul(absA)
+		sign := X80One
+		for i := 1; i <= 15; i += 2 {
+			result = result.Add(term.Div(Int64ToFloatX80(int64(i))).Mul(sign))
+			term = term.Mul(x2)
+			sign = sign.Mul(X80MinusOne)
+		}
+	}
+
+	if a.sign() {
+		result = result.Mul(X80MinusOne)
+	}
+
+	return result
 }
