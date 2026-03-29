@@ -13,8 +13,11 @@ This package is derived from the original SoftFloat package and was implemented 
 ## Installation
 
 ```bash
-go get github.com/jenska/float
+go get github.com/jenska/float@v1.0.0
 ```
+
+### Requirements
+- Go 1.22 or later
 
 ## Development
 
@@ -438,6 +441,10 @@ The implementation is validated against:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a complete list of changes and version history.
 
 ## Related Projects
 
