@@ -1,5 +1,8 @@
 # 80-bit IEEE 754 extended double precision floating-point library for Go
 
+[![CI](https://github.com/jenska/float/actions/workflows/ci.yml/badge.svg)](https://github.com/jenska/float/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jenska/float)](https://goreportcard.com/report/github.com/jenska/float)
+[![codecov](https://codecov.io/gh/jenska/float/branch/main/graph/badge.svg)](https://codecov.io/gh/jenska/float)
 [![Go Reference](https://pkg.go.dev/badge/github.com/jenska/float.svg)](https://pkg.go.dev/github.com/jenska/float)
 
 The float package is a software implementation of floating-point arithmetics that conforms to
@@ -13,7 +16,75 @@ This package is derived from the original SoftFloat package and was implemented 
 go get github.com/jenska/float
 ```
 
-## Quick Start
+## Development
+
+This project includes a Makefile for common development tasks:
+
+```bash
+# Show all available commands
+make help
+
+# Development workflow (format, vet, test)
+make dev
+
+# Run tests with coverage report
+make coverage
+
+# Run benchmarks
+make bench
+
+# Clean build artifacts
+make clean
+```
+
+### Available Make Targets
+- `make all` - Run fmt, vet, and test
+- `make build` - Verify the project compiles
+- `make test` - Run all tests
+- `make bench` - Run benchmarks
+- `make coverage` - Generate coverage report
+- `make fmt` - Format code
+- `make vet` - Run go vet
+- `make clean` - Clean artifacts
+- `make dev` - Development workflow
+- `make ci` - CI workflow
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+### Workflows
+
+- **CI** (`.github/workflows/ci.yml`): Runs on every push and PR
+  - Tests on multiple Go versions (1.21, 1.22, 1.23)
+  - Tests on multiple platforms (Linux, macOS, Windows)
+  - Runs linting and static analysis
+  - Generates and uploads coverage reports
+  - Validates builds
+
+- **Release** (`.github/workflows/release.yml`): Runs on version tags
+  - Creates GitHub releases
+  - Generates release artifacts
+  - Publishes coverage reports
+
+- **CodeQL** (`.github/workflows/codeql.yml`): Security analysis
+  - Runs weekly and on pushes/PRs
+  - Performs security and quality analysis
+
+- **Dependabot** (`.github/dependabot.yml`): Automated dependency updates
+  - Weekly Go module updates
+  - Weekly GitHub Actions updates
+
+### Status Badges
+
+Add these badges to your README:
+
+```markdown
+[![CI](https://github.com/jenska/float/actions/workflows/ci.yml/badge.svg)](https://github.com/jenska/float/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jenska/float)](https://goreportcard.com/report/github.com/jenska/float)
+[![codecov](https://codecov.io/gh/jenska/float/branch/main/graph/badge.svg)](https://codecov.io/gh/jenska/float)
+[![Go Reference](https://pkg.go.dev/badge/github.com/jenska/float.svg)](https://pkg.go.dev/github.com/jenska/float)
+```
 
 ```go
 package main

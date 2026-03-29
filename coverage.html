@@ -1,0 +1,2799 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>float: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/jenska/float/comparisons.go (86.3%)</option>
+				
+				<option value="file1">github.com/jenska/float/conversions.go (45.9%)</option>
+				
+				<option value="file2">github.com/jenska/float/decimal.go (28.7%)</option>
+				
+				<option value="file3">github.com/jenska/float/floatx80.go (44.9%)</option>
+				
+				<option value="file4">github.com/jenska/float/format.go (36.6%)</option>
+				
+				<option value="file5">github.com/jenska/float/operations.go (55.1%)</option>
+				
+				<option value="file6">github.com/jenska/float/primitives.go (61.9%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package float
+
+// Eq returns true if the extended double-precision floating-point value `a' is
+// equal to the corresponding value `b', and false otherwise.  The comparison is
+// performed according to the IEC/IEEE Standard for Binary Floating-Point
+// Arithmetic.
+func (a X80) Eq(b X80) bool <span class="cov8" title="1">{
+        if (a.exp() == 0x7FFF &amp;&amp; a.frac()&lt;&lt;1 != 0) || (b.exp() == 0x7FFF &amp;&amp; b.frac()&lt;&lt;1 != 0) </span><span class="cov8" title="1">{
+                if a.IsSignalingNaN() || b.IsSignalingNaN() </span><span class="cov0" title="0">{
+                        Raise(ExceptionInvalid)
+                }</span>
+                <span class="cov8" title="1">return false</span>
+        }
+        <span class="cov8" title="1">return (a.low == b.low &amp;&amp; a.high == b.high) ||
+                (a.low == 0 &amp;&amp; (a.high|b.high)&lt;&lt;1 == 0)</span>
+}
+
+// Gt returns true if the extended double-precision floating-point value `a' is greater
+// than the corresponding value `b', and false otherwise.
+func (a X80) Gt(b X80) bool <span class="cov8" title="1">{
+        return !a.Le(b)
+}</span>
+
+// Le returns true if the extended double-precision floating-point value `a' is less than or
+// equal to the corresponding value `b', and false otherwise.
+func (a X80) Le(b X80) bool <span class="cov8" title="1">{
+        if (a.exp() == 0x7FFF &amp;&amp; a.frac()&lt;&lt;1 != 0) || (b.exp() == 0x7FFF &amp;&amp; b.frac()&lt;&lt;1 != 0) </span><span class="cov8" title="1">{
+                Raise(ExceptionInvalid)
+                return false
+        }</span>
+        <span class="cov8" title="1">aSign, bSign := a.sign(), b.sign()
+        if aSign != bSign </span><span class="cov8" title="1">{
+                return aSign || ((a.high|b.high)&lt;&lt;1 != 0 || (a.low|b.low) == 0)
+        }</span>
+        <span class="cov8" title="1">if aSign </span><span class="cov0" title="0">{
+                return le128(uint64(b.high), b.low, uint64(a.high), a.low)
+        }</span>
+        <span class="cov8" title="1">return le128(uint64(a.high), a.low, uint64(b.high), b.low)</span>
+}
+
+// Ge returns true if the extended double-precision floating-point value `a' is greater than or
+// equal to the corresponding value `b', and false otherwise.
+func (a X80) Ge(b X80) bool <span class="cov8" title="1">{
+        return !a.Lt(b)
+}</span>
+
+// Lt returns true if the extended double-precision floating-point value `a' is
+// less than the corresponding value `b', and false otherwise.  The comparison
+// is performed according to the IEC/IEEE Standard for Binary Floating-Point
+// Arithmetic.
+func (a X80) Lt(b X80) bool <span class="cov8" title="1">{
+        if (a.exp() == 0x7FFF &amp;&amp; a.frac()&lt;&lt;1 != 0) || (b.exp() == 0x7FFF &amp;&amp; b.frac()&lt;&lt;1 != 0) </span><span class="cov8" title="1">{
+                Raise(ExceptionInvalid)
+                return false
+        }</span>
+        <span class="cov8" title="1">aSign, bSign := a.sign(), b.sign()
+        if aSign != bSign </span><span class="cov8" title="1">{
+                return aSign &amp;&amp; ((a.high|b.high)&lt;&lt;1 != 0 || (a.low|b.low) != 0)
+        }</span>
+        <span class="cov8" title="1">if aSign </span><span class="cov0" title="0">{
+                return lt128(uint64(b.high), b.low, uint64(a.high), a.low)
+        }</span>
+        <span class="cov8" title="1">return lt128(uint64(a.high), a.low, uint64(b.high), b.low)</span>
+}
+
+// EqSignaling returns true if the extended double-precision floating-point value `a' is equal
+// to the corresponding value `b', and false otherwise.  The invalid exception is
+// raised if either operand is a NaN.  Otherwise, the comparison is performed
+// according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
+func (a X80) EqSignaling(b X80) bool <span class="cov8" title="1">{
+        if (a.exp() == 0x7FFF &amp;&amp; a.frac()&lt;&lt;1 != 0) || (b.exp() == 0x7FFF &amp;&amp; b.frac()&lt;&lt;1 != 0) </span><span class="cov8" title="1">{
+                Raise(ExceptionInvalid)
+                return false
+        }</span>
+        <span class="cov8" title="1">return a.low == b.low &amp;&amp; (a.high == b.high || (a.low == 0 &amp;&amp; (a.high|b.high)&lt;&lt;1 == 0))</span>
+}
+
+// GtQuiet returns true if the extended double-precision floating-point value `a' is
+// greater than the corresponding value `b', and false otherwise.  Quiet NaNs
+// do not cause an exception.  Otherwise, the comparison is performed according
+// to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
+func (a X80) GtQuiet(b X80) bool <span class="cov8" title="1">{
+        return !a.LeQuiet(b)
+}</span>
+
+// LeQuiet returns true if the extended double-precision floating-point value `a' is less
+// than or equal to the corresponding value `b', and false otherwise.  Quiet NaNs
+// do not cause an exception.  Otherwise, the comparison is performed according
+// to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
+func (a X80) LeQuiet(b X80) bool <span class="cov8" title="1">{
+        if (a.exp() == 0x7FFF &amp;&amp; a.frac()&lt;&lt;1 != 0) || (b.exp() == 0x7FFF &amp;&amp; b.frac()&lt;&lt;1 != 0) </span><span class="cov8" title="1">{
+                if a.IsSignalingNaN() || b.IsSignalingNaN() </span><span class="cov0" title="0">{
+                        Raise(ExceptionInvalid)
+                }</span>
+                <span class="cov8" title="1">return false</span>
+        }
+        <span class="cov8" title="1">aSign, bSign := a.sign(), b.sign()
+        if aSign != bSign </span><span class="cov8" title="1">{
+                return aSign || (((a.high|b.high)&lt;&lt;1 != 0) || (a.low|b.low) == 0)
+        }</span>
+        <span class="cov8" title="1">if aSign </span><span class="cov0" title="0">{
+                return le128(uint64(b.high), b.low, uint64(a.high), a.low)
+        }</span>
+        <span class="cov8" title="1">return le128(uint64(a.high), a.low, uint64(b.high), b.low)</span>
+}
+
+// GeQuiet returns true if the extended double-precision floating-point value `a' is greater
+// than or equal to the corresponding value `b', and false otherwise.  Quiet NaNs
+// do not cause an exception.  Otherwise, the comparison is performed according
+// to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
+func (a X80) GeQuiet(b X80) bool <span class="cov8" title="1">{
+        return !a.LtQuiet(b)
+}</span>
+
+// LtQuiet returns true if the extended double-precision floating-point value `a' is less
+// than the corresponding value `b', and false otherwise.  Quiet NaNs do not cause
+// an exception.  Otherwise, the comparison is performed according to the
+// IEC/IEEE Standard for Binary Floating-Point Arithmetic.
+func (a X80) LtQuiet(b X80) bool <span class="cov8" title="1">{
+        if (a.exp() == 0x7FFF &amp;&amp; a.frac()&lt;&lt;1 != 0) || (b.exp() == 0x7FFF &amp;&amp; b.frac()&lt;&lt;1 != 0) </span><span class="cov8" title="1">{
+                if a.IsSignalingNaN() || b.IsSignalingNaN() </span><span class="cov0" title="0">{
+                        Raise(ExceptionInvalid)
+                }</span>
+                <span class="cov8" title="1">return false</span>
+        }
+        <span class="cov8" title="1">aSign, bSign := a.sign(), b.sign()
+        if aSign != bSign </span><span class="cov8" title="1">{
+                return aSign &amp;&amp; (((a.high|b.high)&lt;&lt;1 != 0) || (a.low|b.low) != 0)
+        }</span>
+        <span class="cov8" title="1">if aSign </span><span class="cov0" title="0">{
+                return lt128(uint64(b.high), b.low, uint64(a.high), a.low)
+        }</span>
+        <span class="cov8" title="1">return lt128(uint64(a.high), a.low, uint64(b.high), b.low)</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package float
+
+import (
+        "math"
+        "math/bits"
+)
+
+// Int32ToFloatX80 returns the result of converting the 32-bit two's complement integer `a'
+// to the extended double-precision floating-point format.  The conversion
+// is performed according to the IEC/IEEE Standard for Binary Floating-Point
+// Arithmetic.
+func Int32ToFloatX80(a int32) X80 <span class="cov8" title="1">{
+        if a == 0 </span><span class="cov8" title="1">{
+                return X80Zero
+        }</span>
+        <span class="cov8" title="1">absA := a
+        zSign := a &lt; 0
+        if zSign </span><span class="cov8" title="1">{
+                absA = -a
+        }</span>
+        <span class="cov8" title="1">shiftCount := bits.LeadingZeros32(uint32(absA)) + 32
+        return packFloatX80(zSign, 0x403E-shiftCount, uint64(absA)&lt;&lt;shiftCount)</span>
+}
+
+// Int64ToFloatX80 returns the result of converting the 64-bit two's complement integer `a'
+// to the extended double-precision floating-point format.  The conversion
+// is performed according to the IEC/IEEE Standard for Binary Floating-Point
+// Arithmetic.
+func Int64ToFloatX80(a int64) X80 <span class="cov8" title="1">{
+        if a == 0 </span><span class="cov8" title="1">{
+                return X80Zero
+        }</span>
+        <span class="cov8" title="1">absA := a
+        zSign := a &lt; 0
+        if zSign </span><span class="cov8" title="1">{
+                absA = -a
+        }</span>
+        <span class="cov8" title="1">shiftCount := bits.LeadingZeros64(uint64(absA))
+        return packFloatX80(zSign, 0x403E-shiftCount, uint64(absA)&lt;&lt;shiftCount)</span>
+}
+
+// Float32ToFloatX80 returns the result of converting the single-precision floating-point value
+// `a' to the extended double-precision floating-point format.  The conversion
+// is performed according to the IEC/IEEE Standard for Binary Floating-Point
+// Arithmetic.
+func Float32ToFloatX80(a float32) X80 <span class="cov0" title="0">{
+        return Float64ToFloatX80(float64(a))
+}</span>
+
+// Float64ToFloatX80 returns the result of converting the double-precision floating-point value
+// `a' to the extended double-precision floating-point format.  The conversion
+// is performed according to the IEC/IEEE Standard for Binary Floating-Point
+// Arithmetic.
+func Float64ToFloatX80(a float64) X80 <span class="cov8" title="1">{
+        b := math.Float64bits(a)
+        aSig := b &amp; 0x000FFFFFFFFFFFFF
+        aExp := int((b &gt;&gt; 52) &amp; 0x7FF)
+        aSign := b&gt;&gt;63 != 0
+        if aExp == 0x7FF </span><span class="cov8" title="1">{
+                if aSig != 0 </span><span class="cov0" title="0">{
+                        return X80NaN
+                }</span>
+                <span class="cov8" title="1">return packFloatX80(aSign, 0x7FFF, 0x8000000000000000)</span>
+        }
+        <span class="cov8" title="1">if aExp == 0 </span><span class="cov8" title="1">{
+                if aSig == 0 </span><span class="cov8" title="1">{
+                        return packFloatX80(aSign, 0, 0)
+                }</span>
+                <span class="cov0" title="0">shiftCount := bits.LeadingZeros64(aSig) - 11
+                aExp, aSig = 1-shiftCount, aSig&lt;&lt;shiftCount</span>
+        }
+        <span class="cov8" title="1">return packFloatX80(aSign, aExp+0x3C00, (aSig|0x0010000000000000)&lt;&lt;11)</span>
+}
+
+// ToInt32 returns the result of converting the extended double-precision floating-
+// point value `a' to the 32-bit two's complement integer format.  The
+// conversion is performed according to the IEC/IEEE Standard for Binary
+// Floating-Point Arithmetic---which means in particular that the conversion
+// is rounded according to the current rounding mode.  If `a' is a NaN, the
+// largest positive integer is returned.  Otherwise, if the conversion
+// overflows, the largest integer with the same sign as `a' is returned.
+func (a X80) ToInt32() int32 <span class="cov8" title="1">{
+        aSig := a.frac()
+        aExp := a.exp()
+        aSign := a.sign()
+        if (aExp == 0x7FFF) &amp;&amp; uint64(aSig&lt;&lt;1) != 0 </span><span class="cov0" title="0">{
+                aSign = false
+        }</span>
+        <span class="cov8" title="1">shiftCount := 0x4037 - aExp
+        if shiftCount &lt;= 0 </span><span class="cov0" title="0">{
+                shiftCount = 1
+        }</span>
+        <span class="cov8" title="1">aSig = shift64RightJamming(aSig, int16(shiftCount))
+        return roundAndPackInt32(aSign, aSig)</span>
+}
+
+// ToInt32RoundZero returns the result of converting the extended double-precision floating-
+// point value `a' to the 32-bit two's complement integer format.  The
+// conversion is performed according to the IEC/IEEE Standard for Binary
+// Floating-Point Arithmetic, except that the conversion is always rounded
+// toward zero.  If `a' is a NaN, the largest positive integer is returned.
+// Otherwise, if the conversion overflows, the largest integer with the same
+// sign as `a' is returned.
+func (a X80) ToInt32RoundZero() int32 <span class="cov0" title="0">{
+        aSig := a.frac()
+        aExp := a.exp()
+        aSign := a.sign()
+
+        invalid := func() int32 </span><span class="cov0" title="0">{
+                Raise(ExceptionInvalid)
+                if aSign </span><span class="cov0" title="0">{
+                        return math.MinInt32
+                }</span>
+                <span class="cov0" title="0">return math.MaxInt32</span>
+        }
+
+        <span class="cov0" title="0">if 0x401E &lt; aExp </span><span class="cov0" title="0">{
+                if aExp == 0x7FFF &amp;&amp; uint64(aSig&lt;&lt;1) != 0 </span><span class="cov0" title="0">{
+                        aSign = false
+                }</span>
+                <span class="cov0" title="0">return invalid()</span>
+        } else<span class="cov0" title="0"> if aExp &lt; 0x3FFF </span><span class="cov0" title="0">{
+                if aExp != 0 || aSig != 0 </span><span class="cov0" title="0">{
+                        Raise(ExceptionInexact)
+                }</span>
+                <span class="cov0" title="0">return 0</span>
+        }
+        <span class="cov0" title="0">shiftCount := 0x403E - aExp
+        savedASig := aSig
+        aSig &gt;&gt;= shiftCount
+        z := int32(aSig)
+        if aSign </span><span class="cov0" title="0">{
+                z = -z
+        }</span>
+        <span class="cov0" title="0">if (z &lt; 0) != aSign </span><span class="cov0" title="0">{
+                return invalid()
+        }</span>
+        <span class="cov0" title="0">if (aSig &lt;&lt; shiftCount) != savedASig </span><span class="cov0" title="0">{
+                Raise(ExceptionInexact)
+        }</span>
+        <span class="cov0" title="0">return z</span>
+}
+
+// ToInt64 returns the result of converting the extended double-precision floating-
+// point value `a' to the 64-bit two's complement integer format.  The
+// conversion is performed according to the IEC/IEEE Standard for Binary
+// Floating-Point Arithmetic---which means in particular that the conversion
+// is rounded according to the current rounding mode.  If `a' is a NaN,
+// the largest positive integer is returned.  Otherwise, if the conversion
+// overflows, the largest integer with the same sign as `a' is returned.
+func (a X80) ToInt64() int64 <span class="cov8" title="1">{
+        aSig := a.frac()
+        aExp := a.exp()
+        aSign := a.sign()
+        shiftCount := 0x403E - aExp
+        aSigExtra := uint64(0)
+        if shiftCount &lt; 0 </span><span class="cov0" title="0">{
+                Raise(ExceptionInvalid)
+                if !aSign || (aExp == 0x7FFF &amp;&amp; aSig != 0x8000000000000000) </span><span class="cov0" title="0">{
+                        return math.MaxInt64
+                }</span>
+                <span class="cov0" title="0">return math.MinInt64</span>
+        }
+        <span class="cov8" title="1">aSig, aSigExtra = shift64ExtraRightJamming(aSig, 0, int16(shiftCount))
+        return roundAndPackInt64(aSign, aSig, aSigExtra)</span>
+}
+
+// ToInt64RoundZero returns the result of converting the extended double-precision
+// floating-point value `a' to the 64-bit two's complement integer format.  The
+// conversion is performed according to the IEC/IEEE Standard for Binary
+// Floating-Point Arithmetic, except that the conversion is always rounded
+// toward zero.  If `a' is a NaN, the largest positive integer is returned.
+// Otherwise, if the conversion overflows, the largest integer with the same
+// sign as `a' is returned.
+func (a X80) ToInt64RoundZero() int64 <span class="cov0" title="0">{
+        aSig := a.frac()
+        aExp := a.exp()
+        aSign := a.sign()
+        shiftCount := aExp - 0x403E
+        if 0 &lt;= shiftCount </span><span class="cov0" title="0">{
+                aSig &amp;= math.MaxInt64
+                if a.high != 0xC03E || aSig != 0 </span><span class="cov0" title="0">{
+                        Raise(ExceptionInvalid)
+                        if !aSign || ((aExp == 0x7FFF) &amp;&amp; aSig != 0) </span><span class="cov0" title="0">{
+                                return math.MaxInt64
+                        }</span>
+                }
+                <span class="cov0" title="0">return math.MaxInt64</span>
+        } else<span class="cov0" title="0"> if aExp &lt; 0x3FFF </span><span class="cov0" title="0">{
+                if aExp != 0 || aSig != 0 </span><span class="cov0" title="0">{
+                        Raise(ExceptionInexact)
+                }</span>
+                <span class="cov0" title="0">return 0</span>
+        }
+        <span class="cov0" title="0">z := int64(aSig) &gt;&gt; (-shiftCount)
+        if uint64(aSig&lt;&lt;(shiftCount&amp;63)) != 0 </span><span class="cov0" title="0">{
+                Raise(ExceptionInexact)
+        }</span>
+        <span class="cov0" title="0">if aSign </span><span class="cov0" title="0">{
+                z = -z
+        }</span>
+        <span class="cov0" title="0">return z</span>
+}
+
+// ToFloat32 returns the result of converting the extended double-precision floating-
+// point value `a' to the double-precision floating-point format.  The
+// conversion is performed according to the IEC/IEEE Standard for Binary
+// Floating-Point Arithmetic.
+func (a X80) ToFloat32() float32 <span class="cov0" title="0">{
+        return float32(a.ToFloat64())
+}</span>
+
+// ToFloat64 returns the result of converting the extended double-precision floating-
+// point value `a' to the double-precision floating-point format.  The
+// conversion is performed according to the IEC/IEEE Standard for Binary
+// Floating-Point Arithmetic.
+func (a X80) ToFloat64() float64 <span class="cov8" title="1">{
+        aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
+        if aExp == 0x7FFF </span><span class="cov8" title="1">{
+                if aSig&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                        return math.NaN()
+                }</span>
+                <span class="cov8" title="1">return packFloat64(aSign, 0x7FF, 0)</span>
+        }
+        <span class="cov8" title="1">zSig := shift64RightJamming(aSig, 1)
+        if aExp != 0 || aSig != 0 </span><span class="cov8" title="1">{
+                aExp -= 0x3C01
+        }</span>
+        <span class="cov8" title="1">return roundAndPackFloat64(aSign, int16(aExp), zSig)</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Multiprecision decimal numbers.
+// For floating-point formatting only; not general purpose.
+// Only operations are assign and (binary) left/right shift.
+// Can do binary floating point in multiprecision decimal precisely
+// because 2 divides 10; cannot do decimal floating point
+// in multiprecision binary precisely.
+
+package float
+
+import "math/bits"
+
+type decimal struct {
+        d     [800]byte // digits, big-endian representation
+        nd    int       // number of digits used
+        dp    int       // decimal point
+        neg   bool      // negative flag
+        trunc bool      // discarded nonzero digits beyond d[:nd]
+}
+
+func (a *decimal) String() string <span class="cov0" title="0">{
+        n := 10 + a.nd
+        if a.dp &gt; 0 </span><span class="cov0" title="0">{
+                n += a.dp
+        }</span>
+        <span class="cov0" title="0">if a.dp &lt; 0 </span><span class="cov0" title="0">{
+                n += -a.dp
+        }</span>
+
+        <span class="cov0" title="0">buf := make([]byte, n)
+        w := 0
+        switch </span>{
+        case a.nd == 0:<span class="cov0" title="0">
+                return "0"</span>
+
+        case a.dp &lt;= 0:<span class="cov0" title="0">
+                // zeros fill space between decimal point and digits
+                buf[w] = '0'
+                w++
+                buf[w] = '.'
+                w++
+                w += digitZero(buf[w : w+-a.dp])
+                w += copy(buf[w:], a.d[0:a.nd])</span>
+
+        case a.dp &lt; a.nd:<span class="cov0" title="0">
+                // decimal point in middle of digits
+                w += copy(buf[w:], a.d[0:a.dp])
+                buf[w] = '.'
+                w++
+                w += copy(buf[w:], a.d[a.dp:a.nd])</span>
+
+        default:<span class="cov0" title="0">
+                // zeros fill space between digits and decimal point
+                w += copy(buf[w:], a.d[0:a.nd])
+                w += digitZero(buf[w : w+a.dp-a.nd])</span>
+        }
+        <span class="cov0" title="0">return string(buf[0:w])</span>
+}
+
+func digitZero(dst []byte) int <span class="cov0" title="0">{
+        for i := range dst </span><span class="cov0" title="0">{
+                dst[i] = '0'
+        }</span>
+        <span class="cov0" title="0">return len(dst)</span>
+}
+
+// trim trailing zeros from number.
+// (They are meaningless; the decimal point is tracked
+// independent of the number of digits.)
+func trim(a *decimal) <span class="cov8" title="1">{
+        for a.nd &gt; 0 &amp;&amp; a.d[a.nd-1] == '0' </span><span class="cov0" title="0">{
+                a.nd--
+        }</span>
+        <span class="cov8" title="1">if a.nd == 0 </span><span class="cov0" title="0">{
+                a.dp = 0
+        }</span>
+}
+
+// Assign v to a.
+func (a *decimal) Assign(v uint64) <span class="cov8" title="1">{
+        var buf [24]byte
+
+        // Write reversed decimal in buf.
+        n := 0
+        for v &gt; 0 </span><span class="cov8" title="1">{
+                v1 := v / 10
+                v -= 10 * v1
+                buf[n] = byte(v + '0')
+                n++
+                v = v1
+        }</span>
+
+        // Reverse again to produce forward decimal in a.d.
+        <span class="cov8" title="1">a.nd = 0
+        for n--; n &gt;= 0; n-- </span><span class="cov8" title="1">{
+                a.d[a.nd] = buf[n]
+                a.nd++
+        }</span>
+        <span class="cov8" title="1">a.dp = a.nd
+        trim(a)</span>
+}
+
+// Maximum shift that we can do in one pass without overflow.
+// A uint has 32 or 64 bits, and we have to be able to accommodate 9&lt;&lt;k.
+const uintSize = 32 &lt;&lt; (^uint(0) &gt;&gt; 63)
+const maxShift = uintSize - 4
+
+// Binary shift right (/ 2) by k bits.  k &lt;= maxShift to avoid overflow.
+func rightShift(a *decimal, k uint) <span class="cov8" title="1">{
+        r := 0 // read pointer
+        w := 0 // write pointer
+
+        // Pick up enough leading digits to cover first shift.
+        var n uint
+        for ; n&gt;&gt;k == 0; r++ </span><span class="cov8" title="1">{
+                if r &gt;= a.nd </span><span class="cov8" title="1">{
+                        if n == 0 </span><span class="cov0" title="0">{
+                                // a == 0; shouldn't get here, but handle anyway.
+                                a.nd = 0
+                                return
+                        }</span>
+                        <span class="cov8" title="1">for n&gt;&gt;k == 0 </span><span class="cov8" title="1">{
+                                n = n * 10
+                                r++
+                        }</span>
+                        <span class="cov8" title="1">break</span>
+                }
+                <span class="cov8" title="1">c := uint(a.d[r])
+                n = n*10 + c - '0'</span>
+        }
+        <span class="cov8" title="1">a.dp -= r - 1
+
+        var mask uint = (1 &lt;&lt; k) - 1
+
+        // Pick up a digit, put down a digit.
+        for ; r &lt; a.nd; r++ </span><span class="cov8" title="1">{
+                c := uint(a.d[r])
+                dig := n &gt;&gt; k
+                n &amp;= mask
+                a.d[w] = byte(dig + '0')
+                w++
+                n = n*10 + c - '0'
+        }</span>
+
+        // Put down extra digits.
+        <span class="cov8" title="1">for n &gt; 0 </span><span class="cov8" title="1">{
+                dig := n &gt;&gt; k
+                n &amp;= mask
+                if w &lt; len(a.d) </span><span class="cov8" title="1">{
+                        a.d[w] = byte(dig + '0')
+                        w++
+                }</span> else<span class="cov0" title="0"> if dig &gt; 0 </span><span class="cov0" title="0">{
+                        a.trunc = true
+                }</span>
+                <span class="cov8" title="1">n = n * 10</span>
+        }
+
+        <span class="cov8" title="1">a.nd = w
+        trim(a)</span>
+}
+
+// Cheat sheet for left shift: table indexed by shift count giving
+// number of new digits that will be introduced by that shift.
+//
+// For example, leftcheats[4] = {2, "625"}.  That means that
+// if we are shifting by 4 (multiplying by 16), it will add 2 digits
+// when the string prefix is "625" through "999", and one fewer digit
+// if the string prefix is "000" through "624".
+//
+// Credit for this trick goes to Ken.
+
+type leftCheat struct {
+        delta  int    // number of new digits
+        cutoff string // minus one digit if original &lt; a.
+}
+
+var leftcheats = []leftCheat{
+        // Leading digits of 1/2^i = 5^i.
+        // 5^23 is not an exact 64-bit floating point number,
+        // so have to use bc for the math.
+        // Go up to 60 to be large enough for 32bit and 64bit platforms.
+        /*
+                seq 60 | sed 's/^/5^/' | bc |
+                awk 'BEGIN{ print "\t{ 0, \"\" }," }
+                {
+                        log2 = log(2)/log(10)
+                        printf("\t{ %d, \"%s\" },\t// * %d\n",
+                                int(log2*NR+1), $0, 2**NR)
+                }'
+        */
+        {0, ""},
+        {1, "5"},                                           // * 2
+        {1, "25"},                                          // * 4
+        {1, "125"},                                         // * 8
+        {2, "625"},                                         // * 16
+        {2, "3125"},                                        // * 32
+        {2, "15625"},                                       // * 64
+        {3, "78125"},                                       // * 128
+        {3, "390625"},                                      // * 256
+        {3, "1953125"},                                     // * 512
+        {4, "9765625"},                                     // * 1024
+        {4, "48828125"},                                    // * 2048
+        {4, "244140625"},                                   // * 4096
+        {4, "1220703125"},                                  // * 8192
+        {5, "6103515625"},                                  // * 16384
+        {5, "30517578125"},                                 // * 32768
+        {5, "152587890625"},                                // * 65536
+        {6, "762939453125"},                                // * 131072
+        {6, "3814697265625"},                               // * 262144
+        {6, "19073486328125"},                              // * 524288
+        {7, "95367431640625"},                              // * 1048576
+        {7, "476837158203125"},                             // * 2097152
+        {7, "2384185791015625"},                            // * 4194304
+        {7, "11920928955078125"},                           // * 8388608
+        {8, "59604644775390625"},                           // * 16777216
+        {8, "298023223876953125"},                          // * 33554432
+        {8, "1490116119384765625"},                         // * 67108864
+        {9, "7450580596923828125"},                         // * 134217728
+        {9, "37252902984619140625"},                        // * 268435456
+        {9, "186264514923095703125"},                       // * 536870912
+        {10, "931322574615478515625"},                      // * 1073741824
+        {10, "4656612873077392578125"},                     // * 2147483648
+        {10, "23283064365386962890625"},                    // * 4294967296
+        {10, "116415321826934814453125"},                   // * 8589934592
+        {11, "582076609134674072265625"},                   // * 17179869184
+        {11, "2910383045673370361328125"},                  // * 34359738368
+        {11, "14551915228366851806640625"},                 // * 68719476736
+        {12, "72759576141834259033203125"},                 // * 137438953472
+        {12, "363797880709171295166015625"},                // * 274877906944
+        {12, "1818989403545856475830078125"},               // * 549755813888
+        {13, "9094947017729282379150390625"},               // * 1099511627776
+        {13, "45474735088646411895751953125"},              // * 2199023255552
+        {13, "227373675443232059478759765625"},             // * 4398046511104
+        {13, "1136868377216160297393798828125"},            // * 8796093022208
+        {14, "5684341886080801486968994140625"},            // * 17592186044416
+        {14, "28421709430404007434844970703125"},           // * 35184372088832
+        {14, "142108547152020037174224853515625"},          // * 70368744177664
+        {15, "710542735760100185871124267578125"},          // * 140737488355328
+        {15, "3552713678800500929355621337890625"},         // * 281474976710656
+        {15, "17763568394002504646778106689453125"},        // * 562949953421312
+        {16, "88817841970012523233890533447265625"},        // * 1125899906842624
+        {16, "444089209850062616169452667236328125"},       // * 2251799813685248
+        {16, "2220446049250313080847263336181640625"},      // * 4503599627370496
+        {16, "11102230246251565404236316680908203125"},     // * 9007199254740992
+        {17, "55511151231257827021181583404541015625"},     // * 18014398509481984
+        {17, "277555756156289135105907917022705078125"},    // * 36028797018963968
+        {17, "1387778780781445675529539585113525390625"},   // * 72057594037927936
+        {18, "6938893903907228377647697925567626953125"},   // * 144115188075855872
+        {18, "34694469519536141888238489627838134765625"},  // * 288230376151711744
+        {18, "173472347597680709441192448139190673828125"}, // * 576460752303423488
+        {19, "867361737988403547205962240695953369140625"}, // * 1152921504606846976
+}
+
+// Is the leading prefix of b lexicographically less than s?
+func prefixIsLessThan(b []byte, s string) bool <span class="cov0" title="0">{
+        for i := 0; i &lt; len(s); i++ </span><span class="cov0" title="0">{
+                if i &gt;= len(b) </span><span class="cov0" title="0">{
+                        return true
+                }</span>
+                <span class="cov0" title="0">if b[i] != s[i] </span><span class="cov0" title="0">{
+                        return b[i] &lt; s[i]
+                }</span>
+        }
+        <span class="cov0" title="0">return false</span>
+}
+
+// Binary shift left (* 2) by k bits.  k &lt;= maxShift to avoid overflow.
+func leftShift(a *decimal, k uint) <span class="cov0" title="0">{
+        delta := leftcheats[k].delta
+        if prefixIsLessThan(a.d[0:a.nd], leftcheats[k].cutoff) </span><span class="cov0" title="0">{
+                delta--
+        }</span>
+
+        <span class="cov0" title="0">r := a.nd         // read index
+        w := a.nd + delta // write index
+
+        // Pick up a digit, put down a digit.
+        var n uint
+        for r--; r &gt;= 0; r-- </span><span class="cov0" title="0">{
+                n += (uint(a.d[r]) - '0') &lt;&lt; k
+                quo := n / 10
+                rem := n - 10*quo
+                w--
+                if w &lt; len(a.d) </span><span class="cov0" title="0">{
+                        a.d[w] = byte(rem + '0')
+                }</span> else<span class="cov0" title="0"> if rem != 0 </span><span class="cov0" title="0">{
+                        a.trunc = true
+                }</span>
+                <span class="cov0" title="0">n = quo</span>
+        }
+
+        // Put down extra digits.
+        <span class="cov0" title="0">for n &gt; 0 </span><span class="cov0" title="0">{
+                quo := n / 10
+                rem := n - 10*quo
+                w--
+                if w &lt; len(a.d) </span><span class="cov0" title="0">{
+                        a.d[w] = byte(rem + '0')
+                }</span> else<span class="cov0" title="0"> if rem != 0 </span><span class="cov0" title="0">{
+                        a.trunc = true
+                }</span>
+                <span class="cov0" title="0">n = quo</span>
+        }
+
+        <span class="cov0" title="0">a.nd += delta
+        if a.nd &gt;= len(a.d) </span><span class="cov0" title="0">{
+                a.nd = len(a.d)
+        }</span>
+        <span class="cov0" title="0">a.dp += delta
+        trim(a)</span>
+}
+
+// Binary shift left (k &gt; 0) or right (k &lt; 0).
+func (a *decimal) Shift(k int) <span class="cov8" title="1">{
+        switch </span>{
+        case a.nd == 0:<span class="cov0" title="0"></span>
+                // nothing to do: a == 0
+        case k &gt; 0:<span class="cov0" title="0">
+                for k &gt; maxShift </span><span class="cov0" title="0">{
+                        leftShift(a, maxShift)
+                        k -= maxShift
+                }</span>
+                <span class="cov0" title="0">leftShift(a, uint(k))</span>
+        case k &lt; 0:<span class="cov8" title="1">
+                for k &lt; -maxShift </span><span class="cov8" title="1">{
+                        rightShift(a, maxShift)
+                        k += maxShift
+                }</span>
+                <span class="cov8" title="1">rightShift(a, uint(-k))</span>
+        }
+}
+
+// If we chop a at nd digits, should we round up?
+func shouldRoundUp(a *decimal, nd int) bool <span class="cov8" title="1">{
+        if nd &lt; 0 || nd &gt;= a.nd </span><span class="cov0" title="0">{
+                return false
+        }</span>
+        <span class="cov8" title="1">if a.d[nd] == '5' &amp;&amp; nd+1 == a.nd </span><span class="cov0" title="0">{ // exactly halfway - round to even
+                // if we truncated, a little higher than what's recorded - always round up
+                if a.trunc </span><span class="cov0" title="0">{
+                        return true
+                }</span>
+                <span class="cov0" title="0">return nd &gt; 0 &amp;&amp; (a.d[nd-1]-'0')%2 != 0</span>
+        }
+        // not halfway - digit tells all
+        <span class="cov8" title="1">return a.d[nd] &gt;= '5'</span>
+}
+
+// Round a to nd digits (or fewer).
+// If nd is zero, it means we're rounding
+// just to the left of the digits, as in
+// 0.09 -&gt; 0.1.
+func (a *decimal) Round(nd int) <span class="cov8" title="1">{
+        if nd &lt; 0 || nd &gt;= a.nd </span><span class="cov0" title="0">{
+                return
+        }</span>
+        <span class="cov8" title="1">if shouldRoundUp(a, nd) </span><span class="cov0" title="0">{
+                a.RoundUp(nd)
+        }</span> else<span class="cov8" title="1"> {
+                a.RoundDown(nd)
+        }</span>
+}
+
+// Round a down to nd digits (or fewer).
+func (a *decimal) RoundDown(nd int) <span class="cov8" title="1">{
+        if nd &lt; 0 || nd &gt;= a.nd </span><span class="cov0" title="0">{
+                return
+        }</span>
+        <span class="cov8" title="1">a.nd = nd
+        trim(a)</span>
+}
+
+// Round a up to nd digits (or fewer).
+func (a *decimal) RoundUp(nd int) <span class="cov0" title="0">{
+        if nd &lt; 0 || nd &gt;= a.nd </span><span class="cov0" title="0">{
+                return
+        }</span>
+
+        // round up
+        <span class="cov0" title="0">for i := nd - 1; i &gt;= 0; i-- </span><span class="cov0" title="0">{
+                c := a.d[i]
+                if c &lt; '9' </span><span class="cov0" title="0">{ // can stop after this digit
+                        a.d[i]++
+                        a.nd = i + 1
+                        return
+                }</span>
+        }
+
+        // Number is all 9s.
+        // Change to single 1 with adjusted decimal point.
+        <span class="cov0" title="0">a.d[0] = '1'
+        a.nd = 1
+        a.dp++</span>
+}
+
+const smallsString = "00010203040506070809" +
+        "10111213141516171819" +
+        "20212223242526272829" +
+        "30313233343536373839" +
+        "40414243444546474849" +
+        "50515253545556575859" +
+        "60616263646566676869" +
+        "70717273747576777879" +
+        "80818283848586878889" +
+        "90919293949596979899"
+
+const host32bit = ^uint(0)&gt;&gt;32 == 0
+
+const digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+// formatBits computes the string representation of u in the given base.
+// If neg is set, u is treated as negative int64 value. If apnd is
+// set, the string is appended to dst and the resulting byte slice is
+// returned as the first result value; otherwise the string is returned
+// as the second result value.
+func formatBits(dst []byte, u uint64, base int, neg, apnd bool) (d []byte, s string) <span class="cov0" title="0">{
+        if base &lt; 2 || base &gt; len(digits) </span><span class="cov0" title="0">{
+                panic("strconv: illegal AppendInt/FormatInt base")</span>
+        }
+        // 2 &lt;= base &amp;&amp; base &lt;= len(digits)
+
+        <span class="cov0" title="0">var a [64 + 1]byte // +1 for sign of 64bit value in base 2
+        i := len(a)
+
+        if neg </span><span class="cov0" title="0">{
+                u = -u
+        }</span>
+
+        // convert bits
+        // We use uint values where we can because those will
+        // fit into a single register even on a 32bit machine.
+        <span class="cov0" title="0">if base == 10 </span><span class="cov0" title="0">{
+                // common case: use constants for / because
+                // the compiler can optimize it into a multiply+shift
+
+                if host32bit </span><span class="cov0" title="0">{
+                        // convert the lower digits using 32bit operations
+                        for u &gt;= 1e9 </span><span class="cov0" title="0">{
+                                // Avoid using r = a%b in addition to q = a/b
+                                // since 64bit division and modulo operations
+                                // are calculated by runtime functions on 32bit machines.
+                                q := u / 1e9
+                                us := uint(u - q*1e9) // u % 1e9 fits into a uint
+                                for j := 4; j &gt; 0; j-- </span><span class="cov0" title="0">{
+                                        is := us % 100 * 2
+                                        us /= 100
+                                        i -= 2
+                                        a[i+1] = smallsString[is+1]
+                                        a[i+0] = smallsString[is+0]
+                                }</span>
+
+                                // us &lt; 10, since it contains the last digit
+                                // from the initial 9-digit us.
+                                <span class="cov0" title="0">i--
+                                a[i] = smallsString[us*2+1]
+
+                                u = q</span>
+                        }
+                        // u &lt; 1e9
+                }
+
+                // u guaranteed to fit into a uint
+                <span class="cov0" title="0">us := uint(u)
+                for us &gt;= 100 </span><span class="cov0" title="0">{
+                        is := us % 100 * 2
+                        us /= 100
+                        i -= 2
+                        a[i+1] = smallsString[is+1]
+                        a[i+0] = smallsString[is+0]
+                }</span>
+
+                // us &lt; 100
+                <span class="cov0" title="0">is := us * 2
+                i--
+                a[i] = smallsString[is+1]
+                if us &gt;= 10 </span><span class="cov0" title="0">{
+                        i--
+                        a[i] = smallsString[is]
+                }</span>
+
+        } else<span class="cov0" title="0"> if isPowerOfTwo(base) </span><span class="cov0" title="0">{
+                // Use shifts and masks instead of / and %.
+                // Base is a power of 2 and 2 &lt;= base &lt;= len(digits) where len(digits) is 36.
+                // The largest power of 2 below or equal to 36 is 32, which is 1 &lt;&lt; 5;
+                // i.e., the largest possible shift count is 5. By &amp;-ind that value with
+                // the constant 7 we tell the compiler that the shift count is always
+                // less than 8 which is smaller than any register width. This allows
+                // the compiler to generate better code for the shift operation.
+                shift := uint(bits.TrailingZeros(uint(base))) &amp; 7
+                b := uint64(base)
+                m := uint(base) - 1 // == 1&lt;&lt;shift - 1
+                for u &gt;= b </span><span class="cov0" title="0">{
+                        i--
+                        a[i] = digits[uint(u)&amp;m]
+                        u &gt;&gt;= shift
+                }</span>
+                // u &lt; base
+                <span class="cov0" title="0">i--
+                a[i] = digits[uint(u)]</span>
+        } else<span class="cov0" title="0"> {
+                // general case
+                b := uint64(base)
+                for u &gt;= b </span><span class="cov0" title="0">{
+                        i--
+                        // Avoid using r = a%b in addition to q = a/b
+                        // since 64bit division and modulo operations
+                        // are calculated by runtime functions on 32bit machines.
+                        q := u / b
+                        a[i] = digits[uint(u-q*b)]
+                        u = q
+                }</span>
+                // u &lt; base
+                <span class="cov0" title="0">i--
+                a[i] = digits[uint(u)]</span>
+        }
+
+        // add sign, if any
+        <span class="cov0" title="0">if neg </span><span class="cov0" title="0">{
+                i--
+                a[i] = '-'
+        }</span>
+
+        <span class="cov0" title="0">if apnd </span><span class="cov0" title="0">{
+                d = append(dst, a[i:]...)
+                return
+        }</span>
+        <span class="cov0" title="0">s = string(a[i:])
+        return</span>
+}
+
+func isPowerOfTwo(x int) bool <span class="cov0" title="0">{
+        return x&amp;(x-1) == 0
+}</span>
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">// Package float provides a software implementation of 80-bit IEEE 754 extended
+// double precision floating-point arithmetic.
+//
+// This package implements the X80 type which represents 80-bit extended precision
+// floating-point numbers with 1 sign bit, 15 exponent bits, and 64 mantissa bits
+// (1 integer bit + 63 fraction bits).
+//
+// The implementation is based on the SoftFloat library and provides full IEEE 754
+// compliance including proper handling of special values (NaN, infinity, denormals)
+// and exception conditions.
+//
+// Basic usage:
+//
+//        import "github.com/jenska/float"
+//
+//        // Create values
+//        a := float.X80Pi
+//        b := float.NewFromFloat64(3.14159)
+//
+//        // Perform operations
+//        sum := a.Add(b)
+//        product := a.Mul(b)
+//
+//        // Handle exceptions
+//        float.SetExceptionHandler(func(exc int) {
+//            log.Printf("FP exception: %x", exc)
+//        })
+//
+// For more examples, see the README.md file.
+package float
+
+import (
+        "bytes"
+        "encoding/binary"
+        "fmt"
+        "math"
+        "math/bits"
+        "strconv"
+)
+
+type (
+        // X80 represents the 80-bit extended double precision floating-point type
+        X80 struct {
+                // Sign and exponent.
+                //
+                //    1 bit:   sign
+                //    15 bits: exponent
+                high uint16
+                // Integer part and fraction.
+                //
+                //    1 bit:   integer part
+                //    63 bits: fraction
+                low uint64
+        }
+)
+
+// Software IEC/IEEE floating-point underflow tininess-detection mode.
+const (
+        TininessAfterRounding  = 0
+        TininessBeforeRounding = 1
+)
+
+// DetectTininess tininess-detection mode.
+var DetectTininess = TininessAfterRounding
+
+// Software IEC/IEEE floating-point rounding mode.
+const (
+        RoundNearestEven = 0
+        RoundToZero      = 1
+        RoundDown        = 2
+        RoundUp          = 3
+)
+
+// RoundingMode Software IEC/IEEE floating-point rounding mode.
+var RoundingMode = RoundNearestEven
+
+// Software IEC/IEEE floating-point exception flags.
+const (
+        ExceptionInvalid   = 0x01
+        ExceptionDenormal  = 0x02
+        ExceptionDivbyzero = 0x04
+        ExceptionOverflow  = 0x08
+        ExceptionUnderflow = 0x10
+        ExceptionInexact   = 0x20
+)
+
+// Exception Software IEC/IEEE floating-point exception flags.
+var Exception int = 0
+
+// RoundingPrecision Software IEC/IEEE extended double-precision rounding precision.  Valid
+// values are 32, 64, and 80.
+var RoundingPrecision = 80
+
+// "constants" fpr X80 format
+var (
+        X80Zero     = newFromHexString("00000000000000000000") // 0
+        X80One      = newFromHexString("3FFF8000000000000000") // 1
+        X80MinusOne = newFromHexString("BFFF8000000000000000") // -1
+        X80E        = newFromHexString("4000ADF85458A2BB4800") // e
+        X80Pi       = newFromHexString("4000C90FDAA22168C000") // pi
+        X80Sqrt2    = newFromHexString("BFFFB504F333F9DE6800") // sqrt(2)
+        X80Log2E    = newFromHexString("3FFFB8AA3B295C17F000") // Log2(e)
+        X80Ln2      = newFromHexString("3FFEB17217F7D1CF7800") // Ln(2)
+        X80InfPos   = newFromHexString("7FFF8000000000000000") // inf+
+        X80InfNeg   = newFromHexString("FFFF8000000000000000") // inf-
+        X80NaN      = newFromHexString("7FFFC000000000000000") // NaN
+)
+
+// ExceptionHandler is a function that gets called when a floating-point exception occurs.
+type ExceptionHandler func(exception int)
+
+// Global exception handler. Can be set by users to customize error handling.
+var exceptionHandler ExceptionHandler
+
+// SetExceptionHandler sets a custom handler for floating-point exceptions.
+// The handler function will be called whenever an exception is raised.
+// If no handler is set, exceptions are silently accumulated in the Exception variable.
+func SetExceptionHandler(handler ExceptionHandler) <span class="cov8" title="1">{
+        exceptionHandler = handler
+}</span>
+
+// GetExceptionHandler returns the current exception handler.
+func GetExceptionHandler() ExceptionHandler <span class="cov0" title="0">{
+        return exceptionHandler
+}</span>
+
+// ClearExceptions clears all pending exceptions.
+func ClearExceptions() <span class="cov8" title="1">{
+        Exception = 0
+}</span>
+
+// GetExceptions returns the current exception flags.
+func GetExceptions() int <span class="cov0" title="0">{
+        return Exception
+}</span>
+
+// HasException checks if a specific exception flag is set.
+func HasException(flag int) bool <span class="cov8" title="1">{
+        return (Exception &amp; flag) != 0
+}</span>
+
+// HasAnyException checks if any exception flags are set.
+func HasAnyException() bool <span class="cov8" title="1">{
+        return Exception != 0
+}</span>
+
+// ClearException clears a specific exception flag.
+func ClearException(flag int) <span class="cov0" title="0">{
+        Exception &amp;^= flag
+}</span>
+
+// Raise any or all of the software IEC/IEEE floating-point exception flags.
+func Raise(x int) <span class="cov8" title="1">{
+        Exception |= x
+        if exceptionHandler != nil </span><span class="cov8" title="1">{
+                exceptionHandler(x)
+        }</span>
+}
+
+// NewFromFloat64 returns the result of converting the double-precision floating-point value
+// `a' to the extended double-precision floating-point format.  The conversion
+// is performed according to the IEC/IEEE Standard for Binary Floating-Point
+// Arithmetic.
+func NewFromFloat64(a float64) X80 <span class="cov0" title="0">{
+        return Float64ToFloatX80(a)
+}</span>
+
+// Bytes returns a byte array in byte order LittleEndian or BigEndian of
+// an extended double precision float
+func (a X80) Bytes(order binary.ByteOrder) []byte <span class="cov0" title="0">{
+        buf := new(bytes.Buffer)
+        if err := binary.Write(buf, order, a); err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+        <span class="cov0" title="0">return buf.Bytes()</span>
+}
+
+// NewFromBytes returns a new extended double precision float from a byte array in
+// byte order LittleEndian or BigEndian
+func NewFromBytes(b []byte, order binary.ByteOrder) X80 <span class="cov0" title="0">{
+        buf := bytes.NewReader(b)
+        var result X80
+        if err := binary.Read(buf, order, result); err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+        <span class="cov0" title="0">return result</span>
+}
+
+// Returns the faction bits
+func (a X80) frac() uint64 <span class="cov8" title="1">{
+        return a.low
+}</span>
+
+// Returns the exponent bits
+func (a X80) exp() int <span class="cov8" title="1">{
+        return int(a.high &amp; 0x7fff)
+}</span>
+
+// Returns true if value is negative, false otherwise
+func (a X80) sign() bool <span class="cov8" title="1">{
+        return (a.high &gt;&gt; 15) != 0
+}</span>
+
+// newFromString returns a new 80-bit floating-point value based on s, which
+// contains 20 bytes in hexadecimal format.
+func newFromHexString(s string) X80 <span class="cov8" title="1">{
+        if len(s) != 20 </span><span class="cov0" title="0">{
+                panic(fmt.Errorf("invalid length of float80 hexadecimal representation, expected 20, got %d", len(s)))</span>
+        }
+        <span class="cov8" title="1">high, err := strconv.ParseUint(s[:4], 16, 16)
+        if err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+        <span class="cov8" title="1">low, err := strconv.ParseUint(s[4:], 16, 64)
+        if err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+        <span class="cov8" title="1">return X80{uint16(high), low}</span>
+}
+
+// Takes two extended double-precision floating-point values `a' and `b', one
+// of which is a NaN, and returns the appropriate NaN result.  If either `a' or
+// `b' is a signaling NaN, the invalid exception is raised.
+func propagateFloatX80NaN(a, b X80) X80 <span class="cov8" title="1">{
+        aIsNaN := a.IsNaN()
+        aIsSignalingNaN := a.IsSignalingNaN()
+        bIsNaN := b.IsNaN()
+        bIsSignalingNaN := b.IsSignalingNaN()
+        a.low |= 0xC000000000000000
+        b.low |= 0xC000000000000000
+        if aIsSignalingNaN || bIsSignalingNaN </span><span class="cov0" title="0">{
+                Raise(ExceptionInvalid)
+        }</span>
+        <span class="cov8" title="1">if aIsNaN </span><span class="cov8" title="1">{
+                if aIsSignalingNaN &amp;&amp; bIsNaN </span><span class="cov0" title="0">{
+                        return b
+                }</span>
+                <span class="cov8" title="1">return a</span>
+        }
+        <span class="cov0" title="0">return b</span>
+}
+
+// IsNaN returns true if the value is NaN, otherwise false
+func (a X80) IsNaN() bool <span class="cov8" title="1">{
+        return (a.high&amp;0x7fff) == 0x7fff &amp;&amp; a.low&lt;&lt;1 != 0
+}</span>
+
+// IsSignalingNaN returns true of the value is a signaling NaN, otherwise false
+func (a X80) IsSignalingNaN() bool <span class="cov8" title="1">{
+        aLow := a.low &amp; ^uint64(0x4000000000000000)
+        return (a.high&amp;0x7fff) == 0x7fff &amp;&amp; aLow&lt;&lt;1 != 0 &amp;&amp; a.low == aLow
+}</span>
+
+// IsInf returns true if the value is positive or negative infinity, otherwise false
+func (a X80) IsInf() bool <span class="cov8" title="1">{
+        return (a.high&amp;0x7fff) == 0x7fff &amp;&amp; a.low == 0x8000000000000000
+}</span>
+
+// Takes an abstract floating-point value having sign `zSign', exponent `zExp',
+// and extended significand formed by the concatenation of `zSig0' and `zSig1',
+// and returns the proper extended double-precision floating-point value
+// corresponding to the abstract input.  Ordinarily, the abstract value is
+// rounded and packed into the extended double-precision format, with the
+// inexact exception raised if the abstract input cannot be represented
+// exactly.  However, if the abstract value is too large, the overflow and
+// inexact exceptions are raised and an infinity or maximal finite value is
+// returned.  If the abstract value is too small, the input value is rounded to
+// a subnormal number, and the underflow and inexact exceptions are raised if
+// the abstract input cannot be represented exactly as a subnormal extended
+// double-precision floating-point number.
+//
+//        If `roundingPrecision' is 32 or 64, the result is rounded to the same
+//
+// number of bits as single or double precision, respectively.  Otherwise, the
+// result is rounded to the full precision of the extended double-precision
+// format.
+//
+//        The input significand must be normalized or smaller.  If the input
+//
+// significand is not normalized, `zExp' must be 0; in that case, the result
+// returned is a subnormal number, and it must not require rounding.  The
+// handling of underflow and overflow follows the IEC/IEEE Standard for Binary
+// Floating-Point Arithmetic.
+func roundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zSig1 uint64) X80 <span class="cov8" title="1">{
+        roundingMode := RoundingMode
+        roundNearestEven := roundingMode == RoundNearestEven
+
+        overflow := func(roundMask uint64) X80 </span><span class="cov0" title="0">{
+                Raise(ExceptionOverflow | ExceptionInexact)
+                if roundingMode == RoundToZero ||
+                        (zSign &amp;&amp; roundingMode == RoundUp) ||
+                        (!zSign &amp;&amp; roundingMode == RoundDown) </span><span class="cov0" title="0">{
+                        return packFloatX80(zSign, 0x7FFE, ^roundMask)
+                }</span>
+                <span class="cov0" title="0">return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)</span>
+        }
+
+        <span class="cov8" title="1">precision64 := func(roundIncrement, roundMask uint64) X80 </span><span class="cov0" title="0">{
+                if zSig1 != 0 </span><span class="cov0" title="0">{
+                        zSig0 |= 1
+                }</span>
+                <span class="cov0" title="0">if !roundNearestEven </span><span class="cov0" title="0">{
+                        if roundingMode == RoundToZero </span><span class="cov0" title="0">{
+                                roundIncrement = 0
+                        }</span> else<span class="cov0" title="0"> {
+                                roundIncrement = roundMask
+                                if zSign </span><span class="cov0" title="0">{
+                                        if roundingMode == RoundUp </span><span class="cov0" title="0">{
+                                                roundIncrement = 0
+                                        }</span>
+                                } else<span class="cov0" title="0"> {
+                                        if roundingMode == RoundDown </span><span class="cov0" title="0">{
+                                                roundIncrement = 0
+                                        }</span>
+                                }
+                        }
+                }
+                <span class="cov0" title="0">roundBits := zSig0 &amp; roundMask
+                if 0x7FFD &lt;= uint32(zExp-1) </span><span class="cov0" title="0">{
+                        if 0x7FFE &lt; zExp || ((zExp == 0x7FFE) &amp;&amp; (zSig0+uint64(roundIncrement) &lt; zSig0)) </span><span class="cov0" title="0">{
+                                return overflow(uint64(roundingMode))
+                        }</span>
+                        <span class="cov0" title="0">if zExp &lt;= 0 </span><span class="cov0" title="0">{
+                                isTiny := DetectTininess == TininessBeforeRounding || zExp &lt; 0 || zSig0 &lt;= zSig0+roundIncrement
+                                zSig0 = shift64RightJamming(zSig0, 1-int16(zExp))
+                                zExp = 0
+                                roundBits = zSig0 &amp; roundMask
+                                if isTiny &amp;&amp; roundBits != 0 </span><span class="cov0" title="0">{
+                                        Raise(ExceptionUnderflow)
+                                }</span>
+                                <span class="cov0" title="0">if roundBits != 0 </span><span class="cov0" title="0">{
+                                        Raise(ExceptionInexact)
+                                }</span>
+                                <span class="cov0" title="0">zSig0 += roundIncrement
+                                if int64(zSig0) &lt; 0 </span><span class="cov0" title="0">{
+                                        zExp = 1
+                                }</span>
+                                <span class="cov0" title="0">roundIncrement = roundMask + 1
+                                if roundNearestEven &amp;&amp; (roundBits&lt;&lt;1 == roundIncrement) </span><span class="cov0" title="0">{
+                                        roundMask |= roundIncrement
+                                }</span>
+                                <span class="cov0" title="0">zSig0 &amp;= ^roundMask
+                                return packFloatX80(zSign, zExp, zSig0)</span>
+                        }
+                }
+                <span class="cov0" title="0">if roundBits != 0 </span><span class="cov0" title="0">{
+                        Raise(ExceptionInexact)
+                }</span>
+                <span class="cov0" title="0">zSig0 += roundIncrement
+                if zSig0 &lt; uint64(roundIncrement) </span><span class="cov0" title="0">{
+                        zExp++
+                        zSig0 = 0x8000000000000000
+                }</span>
+                <span class="cov0" title="0">roundIncrement = roundMask + 1
+                if roundNearestEven &amp;&amp; (roundBits&lt;&lt;1 == roundIncrement) </span><span class="cov0" title="0">{
+                        roundMask |= roundIncrement
+                }</span>
+                <span class="cov0" title="0">zSig0 &amp;= ^uint64(roundMask)
+                if zSig0 == 0 </span><span class="cov0" title="0">{
+                        zExp = 0
+                }</span>
+                <span class="cov0" title="0">return packFloatX80(zSign, zExp, zSig0)</span>
+        }
+
+        <span class="cov8" title="1">switch roundingPrecision </span>{
+        case 64:<span class="cov0" title="0">
+                return precision64(0x0000000000000400, 0x00000000000007FF)</span>
+        case 32:<span class="cov0" title="0">
+                return precision64(0x0000008000000000, 0x000000FFFFFFFFFF)</span>
+        default:<span class="cov8" title="1"> // 80
+                increment := int64(zSig1) &lt; 0
+                if !roundNearestEven </span><span class="cov0" title="0">{
+                        if roundingMode == RoundToZero </span><span class="cov0" title="0">{
+                                increment = false
+                        }</span> else<span class="cov0" title="0"> {
+                                if zSign </span><span class="cov0" title="0">{
+                                        increment = roundingMode == RoundDown &amp;&amp; zSig1 != 0
+                                }</span> else<span class="cov0" title="0"> {
+                                        increment = roundingMode == RoundUp &amp;&amp; zSig1 != 0
+                                }</span>
+                        }
+                }
+                <span class="cov8" title="1">if 0x7FFD &lt;= uint32(zExp-1) </span><span class="cov8" title="1">{
+                        if (0x7FFE &lt; zExp) ||
+                                (zExp == 0x7FFE &amp;&amp; zSig0 == 0xFFFFFFFFFFFFFFFF &amp;&amp; increment) </span><span class="cov0" title="0">{
+                                return overflow(0)
+                        }</span>
+                        <span class="cov8" title="1">if zExp &lt;= 0 </span><span class="cov8" title="1">{
+                                isTiny := DetectTininess == TininessBeforeRounding ||
+                                        zExp &lt; 0 ||
+                                        !increment ||
+                                        zSig0 &lt; 0xFFFFFFFFFFFFFFFF
+                                zSig0, zSig1 = shift64ExtraRightJamming(zSig0, zSig1, 1-int16(zExp))
+                                zExp = 0
+                                if isTiny &amp;&amp; zSig1 != 0 </span><span class="cov0" title="0">{
+                                        Raise(ExceptionUnderflow)
+                                }</span>
+                                <span class="cov8" title="1">if zSig1 != 0 </span><span class="cov0" title="0">{
+                                        Raise(ExceptionInexact)
+                                }</span>
+                                <span class="cov8" title="1">if roundNearestEven </span><span class="cov8" title="1">{
+                                        increment = int64(zSig1) &lt; 0
+                                }</span> else<span class="cov0" title="0"> {
+                                        if zSign </span><span class="cov0" title="0">{
+                                                increment = (roundingMode == RoundDown) &amp;&amp; zSig1 != 0
+                                        }</span> else<span class="cov0" title="0"> {
+                                                increment = (roundingMode == RoundUp) &amp;&amp; zSig1 != 0
+                                        }</span>
+                                }
+                                <span class="cov8" title="1">if increment </span><span class="cov0" title="0">{
+                                        zSig0++
+                                        if zSig1&lt;&lt;1 == 0 &amp;&amp; roundNearestEven </span><span class="cov0" title="0">{
+                                                zSig0 &amp;= ^uint64(1)
+                                        }</span>
+                                        <span class="cov0" title="0">if int64(zSig0) &lt; 0 </span><span class="cov0" title="0">{
+                                                zExp = 1
+                                        }</span>
+                                }
+                                <span class="cov8" title="1">return packFloatX80(zSign, zExp, zSig0)</span>
+                        }
+                }
+                <span class="cov8" title="1">if zSig1 != 0 </span><span class="cov8" title="1">{
+                        Raise(ExceptionInexact)
+                }</span>
+
+                <span class="cov8" title="1">if increment </span><span class="cov8" title="1">{
+                        zSig0++
+                        if zSig0 == 0 </span><span class="cov0" title="0">{
+                                zExp++
+                                zSig0 = 0x8000000000000000
+                        }</span> else<span class="cov8" title="1"> {
+                                if zSig1&lt;&lt;1 == 0 &amp;&amp; roundNearestEven </span><span class="cov8" title="1">{
+                                        zSig0 &amp;= ^uint64(1)
+                                }</span>
+                        }
+                } else<span class="cov8" title="1"> {
+                        if zSig0 == 0 </span><span class="cov0" title="0">{
+                                zExp = 0
+                        }</span>
+                }
+                <span class="cov8" title="1">return packFloatX80(zSign, zExp, zSig0)</span>
+        }
+}
+
+// Packs the sign `zSign', exponent `zExp', and significand `zSig' into an
+// extended double-precision floating-point value, returning the result.
+func packFloatX80(zSign bool, zExp int, zSig uint64) X80 <span class="cov8" title="1">{
+        high := uint16(zExp)
+        if zSign </span><span class="cov8" title="1">{
+                high += 1 &lt;&lt; 15
+        }</span>
+        <span class="cov8" title="1">return X80{
+                low:  zSig,
+                high: high,
+        }</span>
+}
+
+// Takes an abstract floating-point value having sign `zSign', exponent
+// `zExp', and significand formed by the concatenation of `zSig0' and `zSig1',
+// and returns the proper extended double-precision floating-point value
+// corresponding to the abstract input.  This routine is just like
+// `roundAndPackFloatx80' except that the input significand does not have to be
+// normalized.
+func normalizeRoundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zSig1 uint64) X80 <span class="cov8" title="1">{
+        if zSig0 == 0 </span><span class="cov0" title="0">{
+                zSig0 = zSig1
+                zSig1 = 0
+                zExp -= 64
+        }</span>
+        <span class="cov8" title="1">shiftCount := bits.LeadingZeros64(zSig0)
+        zSig0, zSig1 = shortShift128Left(zSig0, zSig1, int16(shiftCount))
+        zExp -= shiftCount
+        return roundAndPackFloatX80(roundingPrecision, zSign, zExp, zSig0, zSig1)</span>
+}
+
+// Normalizes the subnormal extended double-precision floating-point value
+// represented by the denormalized significand `aSig'.
+func normalizeFloatX80Subnormal(aSig uint64) (zExp int, zSig uint64) <span class="cov8" title="1">{
+        shiftCount := bits.LeadingZeros64(aSig)
+        zSig = aSig &lt;&lt; shiftCount
+        zExp = 1 - shiftCount
+        return
+}</span>
+
+// Takes a 64-bit fixed-point value `absZ' with binary point between bits 6
+// and 7, and returns the properly rounded 32-bit integer corresponding to the
+// input.  If `zSign' is 1, the input is negated before being converted to an
+// integer.  Bit 63 of `absZ' must be zero.  Ordinarily, the fixed-point input
+// is simply rounded to an integer, with the inexact exception raised if the
+// input cannot be represented exactly as an integer.  However, if the fixed-
+// point input is too large, the invalid exception is raised and the largest
+// positive or negative integer is returned.
+func roundAndPackInt32(zSign bool, absZ uint64) int32 <span class="cov8" title="1">{
+        roundingMode := RoundingMode
+        roundNearestEven := roundingMode == RoundNearestEven
+        roundIncrement := uint64(0x40)
+
+        if !roundNearestEven </span><span class="cov0" title="0">{
+                if roundingMode == RoundToZero </span><span class="cov0" title="0">{
+                        roundIncrement = 0
+                }</span> else<span class="cov0" title="0"> {
+                        roundIncrement = 0x7F
+                        if zSign </span><span class="cov0" title="0">{
+                                if roundingMode == RoundUp </span><span class="cov0" title="0">{
+                                        roundIncrement = 0
+                                }</span>
+                        } else<span class="cov0" title="0"> {
+                                if roundingMode == RoundDown </span><span class="cov0" title="0">{
+                                        roundIncrement = 0
+                                }</span>
+                        }
+                }
+        }
+        <span class="cov8" title="1">roundBits := absZ &amp; 0x7F
+        absZ = (absZ + roundIncrement) &gt;&gt; 7
+        if (roundBits^0x40) == 0 &amp;&amp; roundNearestEven </span><span class="cov0" title="0">{
+                absZ &amp;= ^uint64(1)
+        }</span>
+        <span class="cov8" title="1">z := int32(absZ)
+        if zSign </span><span class="cov8" title="1">{
+                z = -z
+        }</span>
+        <span class="cov8" title="1">if (absZ&gt;&gt;32) != 0 || (z != 0 &amp;&amp; (z &lt; 0) != zSign) </span><span class="cov0" title="0">{
+                Raise(ExceptionInvalid)
+                if zSign </span><span class="cov0" title="0">{
+                        return math.MinInt32
+                }</span>
+                <span class="cov0" title="0">return math.MaxInt32</span>
+        }
+        <span class="cov8" title="1">if roundBits != 0 </span><span class="cov0" title="0">{
+                Raise(ExceptionInexact)
+        }</span>
+        <span class="cov8" title="1">return z</span>
+}
+
+// Takes the 128-bit fixed-point value formed by concatenating `absZ0' and
+// `absZ1', with binary point between bits 63 and 64 (between the input words),
+// and returns the properly rounded 64-bit integer corresponding to the input.
+// If `zSign' is 1, the input is negated before being converted to an integer.
+// Ordinarily, the fixed-point input is simply rounded to an integer, with
+// the inexact exception raised if the input cannot be represented exactly as
+// an integer.  However, if the fixed-point input is too large, the invalid
+// exception is raised and the largest positive or negative integer is
+// returned.
+func roundAndPackInt64(zSign bool, absZ0, absZ1 uint64) int64 <span class="cov8" title="1">{
+        roundingMode := RoundingMode
+        roundNearestEven := roundingMode == RoundNearestEven
+        increment := int64(absZ1) &lt; 0
+
+        overflow := func() int64 </span><span class="cov0" title="0">{
+                Raise(ExceptionInvalid)
+                if zSign </span><span class="cov0" title="0">{
+                        return math.MinInt64
+                }</span>
+                <span class="cov0" title="0">return math.MaxInt64</span>
+        }
+
+        <span class="cov8" title="1">if !roundNearestEven </span><span class="cov0" title="0">{
+                if roundingMode == RoundToZero </span><span class="cov0" title="0">{
+                        increment = false
+                }</span> else<span class="cov0" title="0"> {
+                        if zSign </span><span class="cov0" title="0">{
+                                increment = roundingMode == RoundDown &amp;&amp; absZ1 != 0
+                        }</span> else<span class="cov0" title="0"> {
+                                increment = roundingMode == RoundUp &amp;&amp; absZ1 != 0
+                        }</span>
+                }
+        }
+        <span class="cov8" title="1">if increment </span><span class="cov8" title="1">{
+                absZ0++
+                if absZ0 == 0 </span><span class="cov0" title="0">{
+                        return overflow()
+                }</span>
+                <span class="cov8" title="1">if absZ1&lt;&lt;1 == 0 &amp;&amp; roundNearestEven </span><span class="cov8" title="1">{
+                        absZ0 &amp;= ^uint64(1)
+                }</span>
+        }
+        <span class="cov8" title="1">z := int64(absZ0)
+        if zSign </span><span class="cov8" title="1">{
+                z = -z
+        }</span>
+        <span class="cov8" title="1">if z != 0 &amp;&amp; ((z &lt; 0) != zSign) </span><span class="cov0" title="0">{
+                return overflow()
+        }</span>
+        <span class="cov8" title="1">if absZ1 != 0 </span><span class="cov8" title="1">{
+                Raise(ExceptionInexact)
+        }</span>
+        <span class="cov8" title="1">return z</span>
+}
+
+// Packs the sign `zSign', exponent `zExp', and significand `zSig' into a
+// double-precision floating-point value, returning the result.  After being
+// shifted into the proper positions, the three fields are simply added
+// together to form the result.  This means that any integer portion of `zSig'
+// will be added into the exponent.  Since a properly normalized significand
+// will have an integer portion equal to 1, the `zExp' input should be 1 less
+// than the desired result exponent whenever `zSig' is a complete, normalized
+// significand.
+func packFloat64(zSign bool, zExp int16, zSig uint64) float64 <span class="cov8" title="1">{
+        return math.Float64frombits(x1(zSign)&lt;&lt;63 + uint64(zExp)&lt;&lt;52 + zSig)
+}</span>
+
+// Takes an abstract floating-point value having sign `zSign', exponent `zExp',
+// and significand `zSig', and returns the proper double-precision floating-
+// point value corresponding to the abstract input.  Ordinarily, the abstract
+// value is simply rounded and packed into the double-precision format, with
+// the inexact exception raised if the abstract input cannot be represented
+// exactly.  However, if the abstract value is too large, the overflow and
+// inexact exceptions are raised and an infinity or maximal finite value is
+// returned.  If the abstract value is too small, the input value is rounded
+// to a subnormal number, and the underflow and inexact exceptions are raised
+// if the abstract input cannot be represented exactly as a subnormal double-
+// precision floating-point number.
+//
+//        The input significand `zSig' has its binary point between bits 62
+//
+// and 61, which is 10 bits to the left of the usual location.  This shifted
+// significand must be normalized or smaller.  If `zSig' is not normalized,
+// `zExp' must be 0; in that case, the result returned is a subnormal number,
+// and it must not require rounding.  In the usual case that `zSig' is
+// normalized, `zExp' must be 1 less than the “true” floating-point exponent.
+// The handling of underflow and overflow follows the IEC/IEEE Standard for
+// Binary Floating-Point Arithmetic.
+func roundAndPackFloat64(zSign bool, zExp int16, zSig uint64) float64 <span class="cov8" title="1">{
+        roundingMode := RoundingMode
+        roundNearestEven := roundingMode == RoundNearestEven
+        roundIncrement := int64(0x200)
+        if !roundNearestEven </span><span class="cov0" title="0">{
+                if roundingMode == RoundToZero </span><span class="cov0" title="0">{
+                        roundIncrement = 0
+                }</span> else<span class="cov0" title="0"> {
+                        roundIncrement = 0x3FF
+                        if zSign </span><span class="cov0" title="0">{
+                                if roundingMode == RoundUp </span><span class="cov0" title="0">{
+                                        roundIncrement = 0
+                                }</span>
+                        } else<span class="cov0" title="0"> {
+                                if roundingMode == RoundDown </span><span class="cov0" title="0">{
+                                        roundIncrement = 0
+                                }</span>
+                        }
+                }
+        }
+        <span class="cov8" title="1">roundBits := zSig &amp; 0x3FF
+        if 0x7FD &lt;= uint16(zExp) </span><span class="cov0" title="0">{
+                if 0x7FD &lt; zExp || (zExp == 0x7FD &amp;&amp; int64(zSig)+roundIncrement &lt; 0) </span><span class="cov0" title="0">{
+                        Raise(ExceptionOverflow | ExceptionInexact)
+                        result := packFloat64(zSign, 0x7FF, 0)
+                        if roundIncrement == 0 </span><span class="cov0" title="0">{
+                                return result - 1
+                        }</span>
+                        <span class="cov0" title="0">return result</span>
+                }
+                <span class="cov0" title="0">if zExp &lt; 0 </span><span class="cov0" title="0">{
+                        isTiny := DetectTininess == TininessBeforeRounding || zExp &lt; -1
+                        zSig = shift64RightJamming(zSig, -zExp)
+                        zExp = 0
+                        roundBits = zSig &amp; 0x3FF
+                        if isTiny &amp;&amp; roundBits != 0 </span><span class="cov0" title="0">{
+                                Raise(ExceptionUnderflow)
+                        }</span>
+                }
+        }
+        <span class="cov8" title="1">if roundBits != 0 </span><span class="cov0" title="0">{
+                Raise(ExceptionInexact)
+        }</span>
+        <span class="cov8" title="1">zSig = uint64(int64(zSig)+roundIncrement) &gt;&gt; 10
+        if (roundBits^0x200) == 0 &amp;&amp; roundNearestEven </span><span class="cov0" title="0">{
+                zSig &amp;= uint64(1)
+        }</span>
+        <span class="cov8" title="1">if zSig == 0 </span><span class="cov8" title="1">{
+                zExp = 0
+        }</span>
+        <span class="cov8" title="1">return packFloat64(zSign, zExp, zSig)</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package float
+
+import "fmt"
+
+// Format converts the extended floating-point number f to a string,
+// according to the format fmt. It rounds the result assuming that the
+// original was obtained from a floating-point value of 80 bits.
+//
+// The format fmt is one of
+// 'b' (-ddddp±ddd, a binary exponent),
+// 'e' (-d.dddde±dd, a decimal exponent),
+// 'E' (-d.ddddE±dd, a decimal exponent),
+// 'f' (-ddd.dddd, no exponent),
+//
+// The precision prec controls the number of digits (excluding the exponent)
+// printed by the 'e', 'E', 'f' formats.
+// For 'e', 'E', 'f' it is the number of digits after the decimal point.
+func (a X80) Format(fmt byte, prec int) string <span class="cov8" title="1">{
+        return string(a.genericFtoa(make([]byte, 0, max(int(prec)+4, 24)), fmt, prec))
+}</span>
+
+// Append appends the string form of the floating-point number f,
+// as generated by FormatFloat, to dst and returns the extended buffer.
+func (a X80) Append(dst []byte, fmt byte, prec int) []byte <span class="cov0" title="0">{
+        return a.genericFtoa(dst, fmt, prec)
+}</span>
+
+func (a X80) genericFtoa(dst []byte, fmt byte, prec int) []byte <span class="cov8" title="1">{
+        neg := a.sign()
+        exp := a.exp()
+        mant := a.frac()
+
+        switch exp </span>{
+        case 0x7fff:<span class="cov0" title="0">
+                // Inf, NaN
+                var s string
+                switch </span>{
+                case mant != 0:<span class="cov0" title="0">
+                        s = "NaN"</span>
+                case neg:<span class="cov0" title="0">
+                        s = "-Inf"</span>
+                default:<span class="cov0" title="0">
+                        s = "+Inf"</span>
+                }
+                <span class="cov0" title="0">return append(dst, s...)</span>
+
+        case 0:<span class="cov0" title="0">
+                // denormalized
+                exp++</span>
+
+        default:<span class="cov8" title="1">
+                // add implicit top bit
+                mant |= uint64(1) &lt;&lt; 63</span>
+        }
+        <span class="cov8" title="1">exp -= 0x3fff // -bias
+
+        // Pick off easy binary, hex formats.
+        if fmt == 'b' </span><span class="cov0" title="0">{
+                return fmtB(dst, neg, mant, exp)
+        }</span>
+
+        <span class="cov8" title="1">return bigFtoa(dst, prec, fmt, neg, mant, exp)</span>
+}
+
+// bigFtoa uses multiprecision computations to format a float.
+func bigFtoa(dst []byte, prec int, fmt byte, neg bool, mant uint64, exp int) []byte <span class="cov8" title="1">{
+        d := new(decimal)
+        d.Assign(mant)
+        d.Shift(exp - 63)
+        var digs decimalSlice
+
+        // Round appropriately.
+        switch fmt </span>{
+        case 'e', 'E':<span class="cov0" title="0">
+                d.Round(prec + 1)</span>
+        case 'f':<span class="cov8" title="1">
+                d.Round(d.dp + prec)</span>
+        }
+        <span class="cov8" title="1">digs = decimalSlice{d: d.d[:], nd: d.nd, dp: d.dp}
+
+        return formatDigits(dst, neg, digs, prec, fmt)</span>
+}
+
+func formatDigits(dst []byte, neg bool, digs decimalSlice, prec int, fmt byte) []byte <span class="cov8" title="1">{
+        switch fmt </span>{
+        case 'e', 'E':<span class="cov0" title="0">
+                return fmtE(dst, neg, digs, prec, fmt)</span>
+        case 'f':<span class="cov8" title="1">
+                return fmtF(dst, neg, digs, prec)</span>
+        }
+
+        // unknown format
+        <span class="cov0" title="0">return append(dst, '%', fmt)</span>
+}
+
+type decimalSlice struct {
+        d      []byte
+        nd, dp int
+        neg    bool
+}
+
+// %e: -d.ddddde±dd
+func fmtE(dst []byte, neg bool, d decimalSlice, prec int, fmt byte) []byte <span class="cov0" title="0">{
+        // sign
+        if neg </span><span class="cov0" title="0">{
+                dst = append(dst, '-')
+        }</span>
+
+        // first digit
+        <span class="cov0" title="0">ch := byte('0')
+        if d.nd != 0 </span><span class="cov0" title="0">{
+                ch = d.d[0]
+        }</span>
+        <span class="cov0" title="0">dst = append(dst, ch)
+
+        // .moredigits
+        if prec &gt; 0 </span><span class="cov0" title="0">{
+                dst = append(dst, '.')
+                i := 1
+                m := min(d.nd, prec+1)
+                if i &lt; m </span><span class="cov0" title="0">{
+                        dst = append(dst, d.d[i:m]...)
+                        i = m
+                }</span>
+                <span class="cov0" title="0">for ; i &lt;= prec; i++ </span><span class="cov0" title="0">{
+                        dst = append(dst, '0')
+                }</span>
+        }
+
+        // e±
+        <span class="cov0" title="0">dst = append(dst, fmt)
+        exp := d.dp - 1
+        if d.nd == 0 </span><span class="cov0" title="0">{ // special case: 0 has exponent 0
+                exp = 0
+        }</span>
+        <span class="cov0" title="0">if exp &lt; 0 </span><span class="cov0" title="0">{
+                ch = '-'
+                exp = -exp
+        }</span> else<span class="cov0" title="0"> {
+                ch = '+'
+        }</span>
+        <span class="cov0" title="0">dst = append(dst, ch)
+
+        // dd or ddd
+        switch </span>{
+        case exp &lt; 10:<span class="cov0" title="0">
+                dst = append(dst, '0', byte(exp)+'0')</span>
+        case exp &lt; 100:<span class="cov0" title="0">
+                dst = append(dst, byte(exp/10)+'0', byte(exp%10)+'0')</span>
+        default:<span class="cov0" title="0">
+                dst = append(dst, byte(exp/100)+'0', byte(exp/10)%10+'0', byte(exp%10)+'0')</span>
+        }
+
+        <span class="cov0" title="0">return dst</span>
+}
+
+// %f: -ddddddd.ddddd
+func fmtF(dst []byte, neg bool, d decimalSlice, prec int) []byte <span class="cov8" title="1">{
+        // sign
+        if neg </span><span class="cov8" title="1">{
+                dst = append(dst, '-')
+        }</span>
+
+        // integer, padded with zeros as needed.
+        <span class="cov8" title="1">if d.dp &gt; 0 </span><span class="cov0" title="0">{
+                m := min(d.nd, d.dp)
+                dst = append(dst, d.d[:m]...)
+                for ; m &lt; d.dp; m++ </span><span class="cov0" title="0">{
+                        dst = append(dst, '0')
+                }</span>
+        } else<span class="cov8" title="1"> {
+                dst = append(dst, '0')
+        }</span>
+
+        // fraction
+        <span class="cov8" title="1">if prec &gt; 0 </span><span class="cov8" title="1">{
+                dst = append(dst, '.')
+                for i := 0; i &lt; prec; i++ </span><span class="cov8" title="1">{
+                        ch := byte('0')
+                        if j := d.dp + i; 0 &lt;= j &amp;&amp; j &lt; d.nd </span><span class="cov8" title="1">{
+                                ch = d.d[j]
+                        }</span>
+                        <span class="cov8" title="1">dst = append(dst, ch)</span>
+                }
+        }
+
+        <span class="cov8" title="1">return dst</span>
+}
+
+// %b: -ddddddddp±ddd
+func fmtB(dst []byte, neg bool, mant uint64, exp int) []byte <span class="cov0" title="0">{
+        // sign
+        if neg </span><span class="cov0" title="0">{
+                dst = append(dst, '-')
+        }</span>
+
+        // mantissa
+        <span class="cov0" title="0">dst, _ = formatBits(dst, mant, 10, false, true)
+
+        // p
+        dst = append(dst, 'p')
+
+        // ±exponent
+        exp -= 63
+        if exp &gt;= 0 </span><span class="cov0" title="0">{
+                dst = append(dst, '+')
+        }</span>
+        <span class="cov0" title="0">dst, _ = formatBits(dst, uint64(exp), 10, exp &lt; 0, true)
+
+        return dst</span>
+}
+
+// Internal returns the internal represantion of the 80bit float value in hex format.
+func (a X80) Internal() string <span class="cov0" title="0">{
+        return fmt.Sprintf("%04X%016X", a.high, a.low)
+}</span>
+
+func (a X80) String() string <span class="cov8" title="1">{
+        return a.Format('f', 30)
+}</span>
+
+func min(a, b int) int <span class="cov0" title="0">{
+        if a &lt; b </span><span class="cov0" title="0">{
+                return a
+        }</span>
+        <span class="cov0" title="0">return b</span>
+}
+
+func max(a, b int) int <span class="cov8" title="1">{
+        if a &gt; b </span><span class="cov8" title="1">{
+                return a
+        }</span>
+        <span class="cov0" title="0">return b</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package float
+
+// RoundToInt rounds the extended double-precision floating-point value `a' to an integer,
+// and returns the result as an extended quadruple-precision floating-point
+// value.  The operation is performed according to the IEC/IEEE Standard for
+// Binary Floating-Point Arithmetic.
+func (a X80) RoundToInt() X80 <span class="cov8" title="1">{
+        aExp := a.exp()
+        if 0x403E &lt;= aExp </span><span class="cov8" title="1">{
+                if aExp == 0x7FFF &amp;&amp; a.frac()&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                        return propagateFloatX80NaN(a, a)
+                }</span>
+                <span class="cov8" title="1">return a</span>
+        }
+        <span class="cov8" title="1">if aExp &lt; 0x3FFF </span><span class="cov8" title="1">{
+                if aExp == 0 &amp;&amp; a.frac()&lt;&lt;1 == 0 </span><span class="cov8" title="1">{
+                        return a
+                }</span>
+                <span class="cov8" title="1">Raise(ExceptionInexact)
+                aSign := a.sign()
+                switch RoundingMode </span>{
+                case RoundNearestEven:<span class="cov8" title="1">
+                        if aExp == 0x3FFE &amp;&amp; a.frac()&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                                return packFloatX80(aSign, 0x3FFF, 0x8000000000000000)
+                        }</span>
+                case RoundDown:<span class="cov0" title="0">
+                        if aSign </span><span class="cov0" title="0">{
+                                return packFloatX80(true, 0x3FFF, 0x8000000000000000)
+                        }</span>
+                        <span class="cov0" title="0">return X80Zero</span>
+                case RoundUp:<span class="cov0" title="0">
+                        if aSign </span><span class="cov0" title="0">{
+                                return packFloatX80(true, 0, 0)
+                        }</span>
+                        <span class="cov0" title="0">return packFloatX80(false, 0x3FFF, 0x8000000000000000)</span>
+                }
+                <span class="cov8" title="1">return packFloatX80(aSign, 0, 0)</span>
+        }
+        <span class="cov8" title="1">lastBitMask := uint64(1 &lt;&lt; (0x403E - aExp))
+        roundBitsMask := lastBitMask - 1
+        z := a
+        roundingMode := RoundingMode
+        if roundingMode == RoundNearestEven </span><span class="cov8" title="1">{
+                z.low += lastBitMask &gt;&gt; 1
+                if z.low&amp;roundBitsMask == 0 </span><span class="cov0" title="0">{
+                        z.low &amp;= ^lastBitMask
+                }</span>
+        } else<span class="cov0" title="0"> if roundingMode != RoundToZero </span><span class="cov0" title="0">{
+                if z.sign() != (roundingMode == RoundUp) </span><span class="cov0" title="0">{
+                        z.low += roundBitsMask
+                }</span>
+        }
+        <span class="cov8" title="1">z.low &amp;= ^roundBitsMask
+        if z.low == 0 </span><span class="cov0" title="0">{
+                z.high++
+                z.low = 0x8000000000000000
+        }</span>
+        <span class="cov8" title="1">if z.low != a.low </span><span class="cov8" title="1">{
+                Raise(ExceptionInexact)
+        }</span>
+        <span class="cov8" title="1">return z</span>
+}
+
+// Add returns the result of adding the extended double-precision floating-point
+// values `a' and `b'.  The operation is performed according to the IEC/IEEE
+// Standard for Binary Floating-Point Arithmetic.
+func (a X80) Add(b X80) X80 <span class="cov8" title="1">{
+        aSign, bSign := a.sign(), b.sign()
+        if aSign == bSign </span><span class="cov8" title="1">{
+                return addFloatx80Sigs(a, b, aSign)
+        }</span>
+        <span class="cov8" title="1">return subFloatx80Sigs(a, b, aSign)</span>
+}
+
+// Sub returns the result of subtracting the extended double-precision floating-
+// point values `a' and `b'.  The operation is performed according to the
+// IEC/IEEE Standard for Binary Floating-Point Arithmetic.
+func (a X80) Sub(b X80) X80 <span class="cov8" title="1">{
+        aSign, bSign := a.sign(), b.sign()
+        if aSign == bSign </span><span class="cov8" title="1">{
+                return subFloatx80Sigs(a, b, aSign)
+        }</span>
+        <span class="cov8" title="1">return addFloatx80Sigs(a, b, aSign)</span>
+
+}
+
+// Returns the result of adding the absolute values of the extended double-
+// precision floating-point values `a' and `b'.  If `zSign' is 1, the sum is
+// negated before being returned.  `zSign' is ignored if the result is a NaN.
+// The addition is performed according to the IEC/IEEE Standard for Binary
+// Floating-Point Arithmetic.
+func addFloatx80Sigs(a, b X80, zSign bool) X80 <span class="cov8" title="1">{
+        aSig, bSig := a.frac(), b.frac()
+        aExp, bExp := a.exp(), b.exp()
+        var zSig0, zSig1 uint64
+        var zExp int
+        expDiff := aExp - bExp
+        if 0 &lt; expDiff </span><span class="cov8" title="1">{
+                if aExp == 0x7FFF </span><span class="cov8" title="1">{
+                        if aSig&lt;&lt;1 != 0 </span><span class="cov8" title="1">{
+                                return propagateFloatX80NaN(a, b)
+                        }</span>
+                        <span class="cov8" title="1">return a</span>
+                }
+                <span class="cov8" title="1">if bExp == 0 </span><span class="cov0" title="0">{
+                        expDiff--
+                }</span>
+                <span class="cov8" title="1">bSig, zSig1 = shift64ExtraRightJamming(bSig, 0, int16(expDiff))
+                zExp = aExp</span>
+        } else<span class="cov8" title="1"> if expDiff &lt; 0 </span><span class="cov8" title="1">{
+                if bExp == 0x7FFF </span><span class="cov0" title="0">{
+                        if bSig&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                                return propagateFloatX80NaN(a, b)
+                        }</span>
+                        <span class="cov0" title="0">return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)</span>
+                }
+                <span class="cov8" title="1">if aExp == 0 </span><span class="cov8" title="1">{
+                        expDiff++
+                }</span>
+                <span class="cov8" title="1">aSig, zSig1 = shift64ExtraRightJamming(aSig, 0, int16(-expDiff))
+                zExp = bExp</span>
+        } else<span class="cov8" title="1"> {
+                if aExp == 0x7FFF </span><span class="cov0" title="0">{
+                        if (aSig|bSig)&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                                return propagateFloatX80NaN(a, b)
+                        }</span>
+                        <span class="cov0" title="0">return a</span>
+                }
+                <span class="cov8" title="1">zSig1 = 0
+                zSig0 = aSig + bSig
+                if aExp == 0 </span><span class="cov8" title="1">{
+                        zExp, zSig0 = normalizeFloatX80Subnormal(zSig0)
+                        return roundAndPackFloatX80(RoundingPrecision, zSign, zExp, zSig0, zSig1)
+                }</span>
+                <span class="cov8" title="1">zExp = aExp
+                goto shiftRight</span>
+        }
+        <span class="cov8" title="1">zSig0 = aSig + bSig
+        if int64(zSig0) &lt; 0 </span><span class="cov8" title="1">{
+                return roundAndPackFloatX80(RoundingPrecision, zSign, zExp, zSig0, zSig1)
+        }</span>
+shiftRight:
+        <span class="cov8" title="1">zSig0, zSig1 = shift64ExtraRightJamming(zSig0, zSig1, 1)
+        zSig0 |= 0x8000000000000000
+        zExp++
+        return roundAndPackFloatX80(RoundingPrecision, zSign, zExp, zSig0, zSig1)</span>
+}
+
+// Returns the result of subtracting the absolute values of the extended
+// double-precision floating-point values `a' and `b'.  If `zSign' is 1, the
+// difference is negated before being returned.  `zSign' is ignored if the
+// result is a NaN.  The subtraction is performed according to the IEC/IEEE
+// Standard for Binary Floating-Point Arithmetic.
+func subFloatx80Sigs(a, b X80, zSign bool) X80 <span class="cov8" title="1">{
+        aSig, bSig := a.frac(), b.frac()
+        aExp, bExp := a.exp(), b.exp()
+        var zSig0, zSig1 uint64
+        var zExp int
+        expDiff := aExp - bExp
+
+        if 0 &lt; expDiff </span><span class="cov8" title="1">{
+                goto aExpBigger</span>
+        }
+        <span class="cov8" title="1">if expDiff &lt; 0 </span><span class="cov0" title="0">{
+                goto bExpBigger</span>
+        }
+        <span class="cov8" title="1">if aExp == 0x7FFF </span><span class="cov8" title="1">{
+                if (aSig|bSig)&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                        return propagateFloatX80NaN(a, b)
+                }</span>
+                <span class="cov8" title="1">Raise(ExceptionInvalid)
+                return X80NaN</span>
+        }
+        <span class="cov8" title="1">if aExp == 0 </span><span class="cov8" title="1">{
+                aExp, bExp = 1, 1
+        }</span>
+        <span class="cov8" title="1">zSig1 = 0
+        if bSig &lt; aSig </span><span class="cov8" title="1">{
+                goto aBigger</span>
+        }
+        <span class="cov8" title="1">if aSig &lt; bSig </span><span class="cov8" title="1">{
+                goto bBigger</span>
+        }
+        <span class="cov8" title="1">return packFloatX80(RoundingMode == RoundDown, 0, 0)
+</span>bExpBigger:
+        <span class="cov0" title="0">if bExp == 0x7FFF </span><span class="cov0" title="0">{
+                if bSig&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                        return propagateFloatX80NaN(a, b)
+                }</span>
+                <span class="cov0" title="0">return packFloatX80(!zSign, 0x7FFF, 0x8000000000000000)</span>
+        }
+        <span class="cov0" title="0">if aExp == 0 </span><span class="cov0" title="0">{
+                expDiff++
+        }</span>
+        <span class="cov0" title="0">aSig, zSig1 = shift128RightJamming(aSig, 0, int16(-expDiff))
+</span>bBigger:
+        <span class="cov8" title="1">zSig0, zSig1 = sub128(bSig, 0, aSig, zSig1)
+        zExp = bExp
+        zSign = !zSign
+        goto normalizeRoundAndPack</span>
+aExpBigger:
+        <span class="cov8" title="1">if aExp == 0x7FFF </span><span class="cov8" title="1">{
+                if uint64(aSig&lt;&lt;1) != 0 </span><span class="cov8" title="1">{
+                        return propagateFloatX80NaN(a, b)
+                }</span>
+                <span class="cov8" title="1">return a</span>
+        }
+        <span class="cov8" title="1">if bExp == 0 </span><span class="cov0" title="0">{
+                expDiff--
+        }</span>
+        <span class="cov8" title="1">bSig, zSig1 = shift128RightJamming(bSig, 0, int16(expDiff))
+</span>aBigger:
+        <span class="cov8" title="1">zSig0, zSig1 = sub128(aSig, 0, bSig, zSig1)
+        zExp = aExp
+</span>normalizeRoundAndPack:
+        <span class="cov8" title="1">return normalizeRoundAndPackFloatX80(
+                RoundingPrecision, zSign, zExp, zSig0, zSig1)</span>
+
+}
+
+// Mul returns the result of multiplying the extended double-precision floating-
+// point values `a' and `b'.  The operation is performed according to the
+// IEC/IEEE Standard for Binary Floating-Point Arithmetic.
+func (a X80) Mul(b X80) X80 <span class="cov8" title="1">{
+        aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
+        bSig, bExp, bSign := b.frac(), b.exp(), b.sign()
+        zSign := aSign != bSign
+
+        if aExp == 0x7FFF </span><span class="cov0" title="0">{
+                if aSig&lt;&lt;1 != 0 || (bExp == 0x7FFF &amp;&amp; bSig&lt;&lt;1 != 0) </span><span class="cov0" title="0">{
+                        return propagateFloatX80NaN(a, b)
+                }</span>
+                <span class="cov0" title="0">if bExp == 0 &amp;&amp; bSig == 0 </span><span class="cov0" title="0">{
+                        Raise(ExceptionInvalid)
+                        return X80NaN
+                }</span>
+                <span class="cov0" title="0">return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)</span>
+        }
+
+        <span class="cov8" title="1">if bExp == 0x7FFF </span><span class="cov0" title="0">{
+                if bSig&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                        return propagateFloatX80NaN(a, b)
+                }</span>
+                <span class="cov0" title="0">if aExp == 0 &amp;&amp; aSig == 0 </span><span class="cov0" title="0">{
+                        Raise(ExceptionInvalid)
+                        return X80NaN
+                }</span>
+                <span class="cov0" title="0">return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)</span>
+        }
+        <span class="cov8" title="1">if aExp == 0 </span><span class="cov8" title="1">{
+                if aSig == 0 </span><span class="cov8" title="1">{
+                        return packFloatX80(zSign, 0, 0)
+                }</span>
+                <span class="cov0" title="0">aExp, aSig = normalizeFloatX80Subnormal(aSig)</span>
+        }
+        <span class="cov8" title="1">if bExp == 0 </span><span class="cov0" title="0">{
+                if bSig == 0 </span><span class="cov0" title="0">{
+                        return packFloatX80(zSign, 0, 0)
+                }</span>
+                <span class="cov0" title="0">bExp, bSig = normalizeFloatX80Subnormal(bSig)</span>
+        }
+        <span class="cov8" title="1">zExp := aExp + bExp - 0x3FFE
+        zSig0, zSig1 := mul64To128(aSig, bSig)
+        if 0 &lt; zSig0 </span><span class="cov8" title="1">{
+                zSig0, zSig1 = shortShift128Left(zSig0, zSig1, 1)
+                zExp--
+        }</span>
+        <span class="cov8" title="1">return roundAndPackFloatX80(RoundingPrecision, zSign, zExp, zSig0, zSig1)</span>
+}
+
+// Div returns the result of dividing the extended double-precision floating-point
+// value `a' by the corresponding value `b'.  The operation is performed
+// according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
+func (a X80) Div(b X80) X80 <span class="cov8" title="1">{
+        aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
+        bSig, bExp, bSign := b.frac(), b.exp(), b.sign()
+        zSign := aSign != bSign
+        if aExp == 0x7FFF </span><span class="cov0" title="0">{
+                if uint64(aSig&lt;&lt;1) != 0 </span><span class="cov0" title="0">{
+                        return propagateFloatX80NaN(a, b)
+                }</span>
+                <span class="cov0" title="0">if bExp == 0x7FFF </span><span class="cov0" title="0">{
+                        if uint64(bSig&lt;&lt;1) != 0 </span><span class="cov0" title="0">{
+                                return propagateFloatX80NaN(a, b)
+                        }</span>
+                        <span class="cov0" title="0">Raise(ExceptionInvalid)
+                        return X80NaN</span>
+                }
+                <span class="cov0" title="0">return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)</span>
+        }
+        <span class="cov8" title="1">if bExp == 0x7FFF </span><span class="cov0" title="0">{
+                if bSig&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                        return propagateFloatX80NaN(a, b)
+                }</span>
+                <span class="cov0" title="0">return packFloatX80(zSign, 0, 0)</span>
+        }
+        <span class="cov8" title="1">if bExp == 0 </span><span class="cov0" title="0">{
+                if bSig == 0 </span><span class="cov0" title="0">{
+                        if aExp != 0 &amp;&amp; aSig != 0 </span><span class="cov0" title="0">{
+                                Raise(ExceptionInvalid)
+                                return X80NaN
+                        }</span>
+                        <span class="cov0" title="0">Raise(ExceptionDivbyzero)
+                        return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)</span>
+                }
+                <span class="cov0" title="0">bExp, bSig = normalizeFloatX80Subnormal(bSig)</span>
+        }
+        <span class="cov8" title="1">if aExp == 0 </span><span class="cov8" title="1">{
+                if aSig == 0 </span><span class="cov8" title="1">{
+                        return packFloatX80(zSign, 0, 0)
+                }</span>
+                <span class="cov0" title="0">aExp, aSig = normalizeFloatX80Subnormal(aSig)</span>
+        }
+        <span class="cov8" title="1">zExp := aExp - bExp + 0x3FFE
+        var rem0, rem1, rem2, term2 uint64
+        if bSig &lt;= aSig </span><span class="cov8" title="1">{
+                aSig, rem1 = shift128Right(aSig, 0, 1)
+                zExp++
+        }</span>
+        <span class="cov8" title="1">zSig0 := estimateDiv128To64(aSig, rem1, bSig)
+        term0, term1 := mul64To128(bSig, zSig0)
+        rem0, rem1 = sub128(aSig, rem1, term0, term1)
+        for int64(rem0) &lt; 0 </span><span class="cov0" title="0">{
+                zSig0--
+                rem0, rem1 = add128(rem0, rem1, 0, bSig)
+        }</span>
+        <span class="cov8" title="1">zSig1 := estimateDiv128To64(rem1, 0, bSig)
+        if zSig1&lt;&lt;1 &lt;= 8 </span><span class="cov8" title="1">{
+                term1, term2 = mul64To128(bSig, zSig1)
+                rem1, rem2 = sub128(rem1, 0, term1, term2)
+                for int64(rem1) &lt; 0 </span><span class="cov0" title="0">{
+                        zSig1--
+                        rem1, rem2 = add128(rem1, rem2, 0, bSig)
+                }</span>
+                <span class="cov8" title="1">if rem1 != 0 &amp;&amp; rem2 != 0 </span><span class="cov0" title="0">{
+                        zSig1 |= 1
+                }</span>
+        }
+        <span class="cov8" title="1">return roundAndPackFloatX80(RoundingPrecision, zSign, zExp, zSig0, zSig1)</span>
+}
+
+// Rem returns the remainder of the extended double-precision floating-point value
+// `a' with respect to the corresponding value `b'.  The operation is performed
+// according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
+func (a X80) Rem(b X80) X80 <span class="cov0" title="0">{
+        aSig0, aExp, aSign := a.frac(), a.exp(), a.sign()
+        bSig, bExp := b.frac(), b.exp()
+        var term0, term1, q uint64
+
+        if aExp == 0x7FFF </span><span class="cov0" title="0">{
+                if aSig0&lt;&lt;1 != 0 || (bExp == 0x7FFF &amp;&amp; bSig&lt;&lt;1 != 0) </span><span class="cov0" title="0">{
+                        return propagateFloatX80NaN(a, b)
+                }</span>
+                <span class="cov0" title="0">Raise(ExceptionInvalid)
+                return X80NaN</span>
+        }
+        <span class="cov0" title="0">if bExp == 0x7FFF </span><span class="cov0" title="0">{
+                if bSig&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                        return propagateFloatX80NaN(a, b)
+                }</span>
+                <span class="cov0" title="0">return a</span>
+        }
+        <span class="cov0" title="0">if bExp == 0 </span><span class="cov0" title="0">{
+                if bSig == 0 </span><span class="cov0" title="0">{
+                        Raise(ExceptionInvalid)
+                        return X80NaN
+                }</span>
+                <span class="cov0" title="0">bExp, bSig = normalizeFloatX80Subnormal(bSig)</span>
+        }
+        <span class="cov0" title="0">if aExp == 0 </span><span class="cov0" title="0">{
+                if aSig0&lt;&lt;1 == 0 </span><span class="cov0" title="0">{
+                        return a
+                }</span>
+                <span class="cov0" title="0">aExp, aSig0 = normalizeFloatX80Subnormal(aSig0)</span>
+        }
+        <span class="cov0" title="0">bSig |= 0x8000000000000000
+        zSign := aSign
+        expDiff := aExp - bExp
+        aSig1 := uint64(0)
+        if expDiff &lt; 0 </span><span class="cov0" title="0">{
+                if expDiff &lt; -1 </span><span class="cov0" title="0">{
+                        return a
+                }</span>
+                <span class="cov0" title="0">aSig0, aSig1 = shift128Right(aSig0, 0, 1)
+                expDiff = 0</span>
+        }
+        <span class="cov0" title="0">if bSig &lt;= aSig0 </span><span class="cov0" title="0">{
+                aSig0 -= bSig
+        }</span>
+        <span class="cov0" title="0">expDiff -= 64
+        for 0 &lt; expDiff </span><span class="cov0" title="0">{
+                q := estimateDiv128To64(aSig0, aSig1, bSig)
+                if 2 &lt; q </span><span class="cov0" title="0">{
+                        q -= 2
+                }</span> else<span class="cov0" title="0"> {
+                        q = 0
+                }</span>
+                <span class="cov0" title="0">term0, term1 = mul64To128(bSig, q)
+                aSig0, aSig1 = sub128(aSig0, aSig1, term0, term1)
+                aSig0, aSig1 = shortShift128Left(aSig0, aSig1, 62)
+                expDiff -= 62</span>
+        }
+        <span class="cov0" title="0">expDiff += 64
+        if 0 &lt; expDiff </span><span class="cov0" title="0">{
+                q := estimateDiv128To64(aSig0, aSig1, bSig)
+                if 2 &lt; q </span><span class="cov0" title="0">{
+                        q -= 2
+                }</span> else<span class="cov0" title="0"> {
+                        q = 0
+                }</span>
+                <span class="cov0" title="0">q &gt;&gt;= 64 - expDiff
+                term0, term1 = mul64To128(bSig, q&lt;&lt;(64-expDiff))
+                aSig0, aSig1 = sub128(aSig0, aSig1, term0, term1)
+                term0, term1 = shortShift128Left(0, bSig, int16(64-expDiff))
+                for le128(term0, term1, aSig0, aSig1) </span><span class="cov0" title="0">{
+                        q++
+                        aSig0, aSig1 = sub128(aSig0, aSig1, term0, term1)
+                }</span>
+        } else<span class="cov0" title="0"> {
+                term1 = 0
+                term0 = bSig
+        }</span>
+        <span class="cov0" title="0">alternateASig0, alternateASig1 := sub128(term0, term1, aSig0, aSig1)
+        if lt128(alternateASig0, alternateASig1, aSig0, aSig1) ||
+                eq128(alternateASig0, alternateASig1, aSig0, aSig1) &amp;&amp;
+                        (q&amp;1) != 0 </span><span class="cov0" title="0">{
+                aSig0 = alternateASig0
+                aSig1 = alternateASig1
+                zSign = !zSign
+        }</span>
+        <span class="cov0" title="0">return normalizeRoundAndPackFloatX80(80, zSign, bExp+expDiff, aSig0, aSig1)</span>
+}
+
+// Sqrt returns the square root of the extended double-precision floating-point
+// value `a'.  The operation is performed according to the IEC/IEEE Standard
+// for Binary Floating-Point Arithmetic.
+func (a X80) Sqrt() X80 <span class="cov8" title="1">{
+        aSig0, aExp, aSign := a.frac(), a.exp(), a.sign()
+        var aSig1 uint64
+        if aExp == 0x7FFF </span><span class="cov0" title="0">{
+                if aSig0&lt;&lt;1 != 0 </span><span class="cov0" title="0">{
+                        return propagateFloatX80NaN(a, a)
+                }</span>
+                <span class="cov0" title="0">if !aSign </span><span class="cov0" title="0">{
+                        return a
+                }</span>
+                <span class="cov0" title="0">Raise(ExceptionInvalid)
+                return X80NaN</span>
+        }
+        <span class="cov8" title="1">if aSign </span><span class="cov0" title="0">{
+                if aExp != 0 &amp;&amp; aSig0 != 0 </span><span class="cov0" title="0">{
+                        return a
+                }</span>
+                <span class="cov0" title="0">Raise(ExceptionInvalid)
+                return X80NaN</span>
+        }
+        <span class="cov8" title="1">if aExp == 0 </span><span class="cov0" title="0">{
+                if aSig0 == 0 </span><span class="cov0" title="0">{
+                        return X80Zero
+                }</span>
+                <span class="cov0" title="0">aExp, aSig0 = normalizeFloatX80Subnormal(aSig0)</span>
+        }
+        <span class="cov8" title="1">zExp := ((aExp - 0x3FFF) &gt;&gt; 1) + 0x3FFF
+        zSig0 := uint64(estimateSqrt32(int32(aExp), uint32(aSig0&gt;&gt;32)))
+        aSig0, aSig1 = shift128Right(aSig0, 0, int16(2+(aExp&amp;1)))
+        zSig0 = estimateDiv128To64(aSig0, aSig1, zSig0&lt;&lt;32) + (zSig0 &lt;&lt; 30)
+        doubleZSig0 := zSig0 &lt;&lt; 1
+        term0, term1 := mul64To128(zSig0, zSig0)
+        rem0, rem1 := sub128(aSig0, aSig1, term0, term1)
+        for int64(rem0) &lt; 0 </span><span class="cov0" title="0">{
+                zSig0--
+                doubleZSig0 -= 2
+                rem0, rem1 = add128(rem0, rem1, zSig0&gt;&gt;63, doubleZSig0|1)
+        }</span>
+        <span class="cov8" title="1">zSig1 := estimateDiv128To64(rem1, 0, doubleZSig0)
+        if (zSig1 &amp; 0x3FFFFFFFFFFFFFFF) &lt;= 5 </span><span class="cov0" title="0">{
+                if zSig1 == 0 </span><span class="cov0" title="0">{
+                        zSig1 = 1
+                }</span>
+                <span class="cov0" title="0">term1, term2 := mul64To128(doubleZSig0, zSig1)
+                rem1, rem2 := sub128(rem1, 0, term1, term2)
+                term2, term3 := mul64To128(zSig1, zSig1)
+                rem1, rem2, rem3 := sub192(rem1, rem2, 0, 0, term2, term3)
+                for int(rem1) &lt; 0 </span><span class="cov0" title="0">{
+                        zSig1--
+                        term2, term3 = shortShift128Left(0, zSig1, 1)
+                        term3 |= 1
+                        term2 |= doubleZSig0
+                        rem1, rem2, rem3 = add192(rem1, rem2, rem3, 0, term2, term3)
+                }</span>
+                <span class="cov0" title="0">if (rem1 | rem2 | rem3) != 0 </span><span class="cov0" title="0">{
+                        zSig1 |= uint64(1)
+                }</span>
+        }
+        <span class="cov8" title="1">zSig0, zSig1 = shortShift128Left(0, zSig1, 1)
+        zSig0 |= doubleZSig0
+        return roundAndPackFloatX80(RoundingPrecision, false, zExp, zSig0, zSig1)</span>
+}
+
+// Ln returns the natural logarithm of the extended double-precision floating-point value `a'.
+// The operation is performed using a series expansion for ln(1+x).
+func (a X80) Ln() X80 <span class="cov8" title="1">{
+        if a.IsNaN() || a.sign() </span><span class="cov8" title="1">{
+                Raise(ExceptionInvalid)
+                return X80NaN
+        }</span>
+        <span class="cov8" title="1">if a.Eq(X80Zero) </span><span class="cov8" title="1">{
+                Raise(ExceptionDivbyzero)
+                return X80InfNeg
+        }</span>
+        <span class="cov8" title="1">if a.Eq(X80One) </span><span class="cov8" title="1">{
+                return X80Zero
+        }</span>
+        <span class="cov8" title="1">if a.IsInf() </span><span class="cov8" title="1">{
+                return X80InfPos
+        }</span>
+
+        // Reduce to [1, 2)
+        <span class="cov8" title="1">exp := 0
+        x := a
+        two := newFromHexString("40008000000000000000") // 2
+        for x.Gt(two) </span><span class="cov8" title="1">{                                 // &gt; 2
+                x = x.Div(two) // / 2
+                exp++
+        }</span>
+        <span class="cov8" title="1">for x.Lt(X80One) </span><span class="cov0" title="0">{ // &lt; 1
+                x = x.Mul(two) // * 2
+                exp--
+        }</span>
+
+        // Now x is in [1, 2), compute ln(x) using series ln(1+y) where y = x - 1
+        <span class="cov8" title="1">y := x.Sub(X80One)
+        result := X80Zero
+        term := y
+        sign := X80One
+        for i := 1; i &lt;= 20; i++ </span><span class="cov8" title="1">{
+                result = result.Add(term.Div(Int64ToFloatX80(int64(i))).Mul(sign))
+                term = term.Mul(y)
+                sign = sign.Mul(X80MinusOne)
+        }</span>
+
+        // Add exp * ln(2)
+        <span class="cov8" title="1">if exp != 0 </span><span class="cov8" title="1">{
+                result = result.Add(Int64ToFloatX80(int64(exp)).Mul(X80Ln2))
+        }</span>
+
+        <span class="cov8" title="1">return result</span>
+}
+
+// Atan returns the arctangent of the extended double-precision floating-point value `a'.
+// The operation is performed using a series expansion.
+func (a X80) Atan() X80 <span class="cov8" title="1">{
+        if a.IsNaN() </span><span class="cov0" title="0">{
+                return X80NaN
+        }</span>
+        <span class="cov8" title="1">if a.IsInf() </span><span class="cov8" title="1">{
+                if a.sign() </span><span class="cov8" title="1">{
+                        return X80Pi.Mul(X80MinusOne).Div(Int64ToFloatX80(2))
+                }</span>
+                <span class="cov8" title="1">return X80Pi.Div(Int64ToFloatX80(2))</span>
+        }
+
+        <span class="cov8" title="1">absA := a
+        if a.sign() </span><span class="cov8" title="1">{
+                absA = a.Mul(X80MinusOne)
+        }</span>
+
+        <span class="cov8" title="1">var result X80
+        if absA.Gt(X80One) </span><span class="cov0" title="0">{
+                // For |x| &gt; 1, atan(x) = pi/2 - atan(1/x)
+                invA := X80One.Div(absA)
+                result = X80Pi.Div(Int64ToFloatX80(2)).Sub(invA.Atan())
+        }</span> else<span class="cov8" title="1"> {
+                // Series: atan(x) = x - x^3/3 + x^5/5 - x^7/7 + ...
+                result = X80Zero
+                term := absA
+                x2 := absA.Mul(absA)
+                sign := X80One
+                for i := 1; i &lt;= 15; i += 2 </span><span class="cov8" title="1">{
+                        result = result.Add(term.Div(Int64ToFloatX80(int64(i))).Mul(sign))
+                        term = term.Mul(x2)
+                        sign = sign.Mul(X80MinusOne)
+                }</span>
+        }
+
+        <span class="cov8" title="1">if a.sign() </span><span class="cov8" title="1">{
+                result = result.Mul(X80MinusOne)
+        }</span>
+
+        <span class="cov8" title="1">return result</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package float
+
+// Shifts `a' right by the number of bits given in `count'.  If any nonzero
+// bits are shifted off, they are “jammed” into the least significant bit of
+// the result by setting the least significant bit to 1.  The value of `count'
+// can be arbitrarily large; in particular, if `count' is greater than 64, the
+// result will be either 0 or 1, depending on whether `a' is zero or nonzero.
+func shift64RightJamming(a uint64, count int16) uint64 <span class="cov8" title="1">{
+        if count == 0 </span><span class="cov0" title="0">{
+                return a
+        }</span> else<span class="cov8" title="1"> if count &lt; 64 </span><span class="cov8" title="1">{
+                return a&gt;&gt;count | x1((a&lt;&lt;((-count)&amp;63)) != 0)
+        }</span> else<span class="cov8" title="1"> if a != 0 </span><span class="cov0" title="0">{
+                return 1
+        }</span>
+        <span class="cov8" title="1">return 0</span>
+}
+
+// Shifts the 128-bit value formed by concatenating `a0' and `a1' right by 64
+// _plus_ the number of bits given in `count'.  The shifted result is at most
+// 64 nonzero bits. The bits shifted off form a second 64-bit result as follows:
+// The _last_ bit shifted off is the most-significant bit of the extra result,
+// and the other 63 bits of the extra result are all zero if and only
+// if _all_but_the_last_ bits shifted off were all zero.
+// The value of `count' can be arbitrarily large.
+func shift64ExtraRightJamming(a0, a1 uint64, count int16) (z0, z1 uint64) <span class="cov8" title="1">{
+        if count == 0 </span><span class="cov0" title="0">{
+                z1 = a1
+                z0 = a0
+        }</span> else<span class="cov8" title="1"> if count &lt; 64 </span><span class="cov8" title="1">{
+                z1 = (a0 &lt;&lt; ((-count) &amp; 63)) | x1(a1 != 0)
+                z0 = a0 &gt;&gt; count
+        }</span> else<span class="cov8" title="1"> {
+                if count == 64 </span><span class="cov8" title="1">{
+                        z1 = a0 | x1(a1 != 0)
+                }</span> else<span class="cov8" title="1"> if (a0 | a1) != 0 </span><span class="cov0" title="0">{
+                        z1 = 1
+                }</span>
+                <span class="cov8" title="1">z0 = 0</span>
+        }
+        <span class="cov8" title="1">return</span>
+}
+
+// Shifts the 128-bit value formed by concatenating `a0' and `a1' right by the
+// number of bits given in `count'.  Any bits shifted off are lost.  The value
+// of `count' can be arbitrarily large; in particular, if `count' is greater
+// than 128, the result will be 0.
+func shift128Right(a0, a1 uint64, count int16) (z0, z1 uint64) <span class="cov8" title="1">{
+        negCount := (-count) &amp; 63
+
+        if count == 0 </span><span class="cov0" title="0">{
+                z1 = a1
+                z0 = a0
+        }</span> else<span class="cov8" title="1"> if count &lt; 64 </span><span class="cov8" title="1">{
+                z1 = (a0 &lt;&lt; negCount) | (a1 &gt;&gt; count)
+                z0 = a0 &gt;&gt; count
+        }</span> else<span class="cov0" title="0"> {
+                z1 = 0
+                if count &lt; 64 </span><span class="cov0" title="0">{
+                        z1 = a0 &gt;&gt; (count &amp; 63)
+                }</span>
+                <span class="cov0" title="0">z0 = 0</span>
+        }
+        <span class="cov8" title="1">return</span>
+}
+
+// Shifts the 128-bit value formed by concatenating `a0' and `a1' right by the
+// number of bits given in `count'.  If any nonzero bits are shifted off, they
+// are “jammed” into the least significant bit of the result by setting the
+// least significant bit to 1.  The value of `count' can be arbitrarily large;
+// in particular, if `count' is greater than 128, the result will be either
+// 0 or 1, depending on whether the concatenation of `a0' and `a1' is zero or
+// nonzero.
+func shift128RightJamming(a0, a1 uint64, count int16) (z0, z1 uint64) <span class="cov8" title="1">{
+        negCount := (-count) &amp; 63
+
+        if count == 0 </span><span class="cov0" title="0">{
+                z1 = a1
+                z0 = a0
+        }</span> else<span class="cov8" title="1"> if count &lt; 64 </span><span class="cov8" title="1">{
+                z1 = a0&lt;&lt;negCount | a1&gt;&gt;count | x1(a1&lt;&lt;uint64(negCount) != 0)
+                z0 = a0 &gt;&gt; count
+        }</span> else<span class="cov0" title="0"> {
+                if count == 64 </span><span class="cov0" title="0">{
+                        z1 = a0 | x1(a1 != 0)
+                }</span> else<span class="cov0" title="0"> if count &lt; 128 </span><span class="cov0" title="0">{
+                        z1 = a0&gt;&gt;(count&amp;63) | x1((a0&lt;&lt;negCount)|a1 != 0)
+                }</span> else<span class="cov0" title="0"> if (a0 | a1) != 0 </span><span class="cov0" title="0">{
+                        z1 = 1
+                }</span>
+                <span class="cov0" title="0">z0 = 0</span>
+        }
+        <span class="cov8" title="1">return</span>
+}
+
+// Shifts the 128-bit value formed by concatenating `a0' and `a1' left by the
+// number of bits given in `count'.  Any bits shifted off are lost.  The value
+// of `count' must be less than 64.  The result is broken into two 64-bit
+// pieces
+func shortShift128Left(a0, a1 uint64, count int16) (z0, z1 uint64) <span class="cov8" title="1">{
+        z1 = a1 &lt;&lt; count
+        if count == 0 </span><span class="cov8" title="1">{
+                z0 = a0
+        }</span> else<span class="cov8" title="1"> {
+                z0 = (a0 &lt;&lt; count) | (a1 &gt;&gt; ((-count) &amp; 63))
+        }</span>
+        <span class="cov8" title="1">return</span>
+}
+
+// Subtracts the 128-bit value formed by concatenating `b0' and `b1' from the
+// 128-bit value formed by concatenating `a0' and `a1'.  Subtraction is modulo
+// 2^128, so any borrow out (carry out) is lost.
+func sub128(a0, a1, b0, b1 uint64) (z0, z1 uint64) <span class="cov8" title="1">{
+        z1 = a1 - b1
+        z0 = a0 - b0 - x1(a1 &lt; b1)
+        return
+}</span>
+
+// Adds the 128-bit value formed by concatenating `a0' and `a1' to the 128-bit
+// value formed by concatenating `b0' and `b1'.  Addition is modulo 2^128, so
+// any carry out is lost.
+func add128(a0, a1, b0, b1 uint64) (z0, z1 uint64) <span class="cov8" title="1">{
+        z1 = a1 + b1
+        z0 = a0 + b0 + x1(z1 &lt; a1)
+        return
+}</span>
+
+func x1(x bool) uint64 <span class="cov8" title="1">{
+        if x </span><span class="cov8" title="1">{
+                return 1
+        }</span>
+        <span class="cov8" title="1">return 0</span>
+}
+
+// Adds the 192-bit value formed by concatenating `a0', `a1', and `a2' to the
+// 192-bit value formed by concatenating `b0', `b1', and `b2'.  Addition is
+// modulo 2^192, so any carry out is lost.
+func add192(a0, a1, a2, b0, b1, b2 uint64) (z0, z1, z2 uint64) <span class="cov0" title="0">{
+        z2 = a2 + b2
+        carry1 := (z2 &lt; a2)
+        z1 = a1 + b1
+        carry0 := (z1 &lt; a1)
+        z0 = a0 + b0
+        z1 += x1(carry1)
+        z0 += x1(z1 &lt; x1(carry1))
+        z0 += x1(carry0)
+        return
+}</span>
+
+// Subs the 192-bit value formed by concatenating `a0', `a1', and `a2' from the
+// 192-bit value formed by concatenating `b0', `b1', and `b2'.  Addition is
+// modulo 2^192, so any carry out is lost.
+func sub192(a0, a1, a2, b0, b1, b2 uint64) (z0, z1, z2 uint64) <span class="cov0" title="0">{
+        z2 = a2 - b2
+        borrow1 := a2 &lt; b2
+        z1 = a1 - b1
+        borrow0 := a1 &lt; b1
+        z0 = a0 - b0
+        z0 -= x1(z1 &lt; x1(borrow1))
+        z1 -= x1(borrow1)
+        z0 -= x1(borrow0)
+        return
+}</span>
+
+// Multiplies `a' by `b' to obtain a 128-bit product.
+func mul64To128(a, b uint64) (z0, z1 uint64) <span class="cov8" title="1">{
+        aLow := a &amp; 0xffffffff
+        aHigh := a &gt;&gt; 32
+        bLow := b &amp; 0xffffffff
+        bHigh := b &gt;&gt; 32
+        z1 = aLow * bLow
+        zMiddleA := aLow * bHigh
+        zMiddleB := aHigh * bLow
+        z0 = aHigh * bHigh
+        zMiddleA += zMiddleB
+        z0 += zMiddleA&gt;&gt;32 + x1(zMiddleA &lt; zMiddleB)&lt;&lt;32
+        zMiddleA &lt;&lt;= 32
+        z1 += zMiddleA
+        if z1 &lt; zMiddleA </span><span class="cov8" title="1">{
+                z0++
+        }</span>
+        <span class="cov8" title="1">return</span>
+}
+
+// Returns an approximation to the 64-bit integer quotient obtained by dividing
+// `b' into the 128-bit value formed by concatenating `a0' and `a1'.  The
+// divisor `b' must be at least 2^63.  If q is the exact quotient truncated
+// toward zero, the approximation returned lies between q and q + 2 inclusive.
+// If the exact quotient q is larger than 64 bits, the maximum positive 64-bit
+// unsigned integer is returned.
+func estimateDiv128To64(a0, a1, b uint64) uint64 <span class="cov8" title="1">{
+        if b &lt;= a0 </span><span class="cov0" title="0">{
+                return 0xFFFFFFFFFFFFFFFF
+        }</span>
+        <span class="cov8" title="1">b0 := b &gt;&gt; 32
+        z := uint64(0xFFFFFFFF00000000)
+        if b0&lt;&lt;32 &gt; a0 </span><span class="cov8" title="1">{
+                z = (a0 / b0) &lt;&lt; 32
+        }</span>
+        <span class="cov8" title="1">term0, term1 := mul64To128(b, z)
+        rem0, rem1 := sub128(a0, a1, term0, term1)
+        for int(rem0) &lt; 0 </span><span class="cov8" title="1">{
+                z -= 0x100000000
+                b1 := b &lt;&lt; 32
+                rem0, rem1 = add128(rem0, rem1, b0, b1)
+        }</span>
+        <span class="cov8" title="1">rem0 = (rem0 &lt;&lt; 32) | (rem1 &gt;&gt; 32)
+        if b0&lt;&lt;32 &lt;= rem0 </span><span class="cov0" title="0">{
+                z |= 0xFFFFFFFF
+        }</span> else<span class="cov8" title="1"> {
+                z |= rem0 / b0
+        }</span>
+        <span class="cov8" title="1">return z</span>
+}
+
+// Returns an approximation to the square root of the 32-bit significand given
+// by `a'.  Considered as an integer, `a' must be at least 2^31.  If bit 0 of
+// `aExp' (the least significant bit) is 1, the integer returned approximates
+// 2^31*sqrt(`a'/2^31), where `a' is considered an integer.  If bit 0 of `aExp'
+// is 0, the integer returned approximates 2^31*sqrt(`a'/2^30).  In either
+// case, the approximation returned lies strictly within +/-2 of the exact
+// value.
+func estimateSqrt32(aExp int32, a uint32) (z uint32) <span class="cov8" title="1">{
+        index := (a &gt;&gt; 27) &amp; 15
+        if aExp&amp;1 != 0 </span><span class="cov8" title="1">{
+                z = 0x4000 + (a &gt;&gt; 17) - sqrtOddAdjustments[index]
+                z = ((a / z) &lt;&lt; 14) + (z &lt;&lt; 15)
+                a &gt;&gt;= 1
+        }</span> else<span class="cov0" title="0"> {
+                z = 0x8000 + (a &gt;&gt; 17) - sqrtEvenAdjustments[index]
+                z = a/z + z
+                if 0x20000 &lt;= z </span><span class="cov0" title="0">{
+                        z = 0xFFFF8000
+                }</span> else<span class="cov0" title="0"> {
+                        z &lt;&lt;= 15
+                }</span>
+                <span class="cov0" title="0">if z &lt;= a </span><span class="cov0" title="0">{
+                        return uint32(int32(a) &gt;&gt; 1)
+                }</span>
+        }
+        <span class="cov8" title="1">return uint32((uint64(a)&lt;&lt;31)/uint64(z)) + (z &gt;&gt; 1)</span>
+}
+
+var sqrtOddAdjustments []uint32 = []uint32{
+        0x0004, 0x0022, 0x005D, 0x00B1, 0x011D, 0x019F, 0x0236, 0x02E0,
+        0x039C, 0x0468, 0x0545, 0x0631, 0x072B, 0x0832, 0x0946, 0x0A67,
+}
+var sqrtEvenAdjustments []uint32 = []uint32{
+        0x0A2D, 0x08AF, 0x075A, 0x0629, 0x051A, 0x0429, 0x0356, 0x029E,
+        0x0200, 0x0179, 0x0109, 0x00AF, 0x0068, 0x0034, 0x0012, 0x0002,
+}
+
+// Returns true if the 128-bit value formed by concatenating `a0' and `a1'
+// is equal to the 128-bit value formed by concatenating `b0' and `b1'.
+// Otherwise, returns false.
+func eq128(a0, a1, b0, b1 uint64) bool <span class="cov0" title="0">{
+        return (a0 == b0) &amp;&amp; (a1 == b1)
+}</span>
+
+// Returns true if the 128-bit value formed by concatenating `a0' and `a1' is less
+// than or equal to the 128-bit value formed by concatenating `b0' and `b1'.
+// Otherwise, returns false
+func le128(a0, a1, b0, b1 uint64) bool <span class="cov8" title="1">{
+        return (a0 &lt; b0) || ((a0 == b0) &amp;&amp; (a1 &lt;= b1))
+}</span>
+
+// Returns 1 if the 128-bit value formed by concatenating `a0' and `a1' is less
+// than the 128-bit value formed by concatenating `b0' and `b1'.  Otherwise,
+// returns 0.
+func lt128(a0, a1, b0, b1 uint64) bool <span class="cov8" title="1">{
+        return (a0 &lt; b0) || ((a0 == b0) &amp;&amp; (a1 &lt; b1))
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
