@@ -96,7 +96,6 @@ func formatDigits(dst []byte, neg bool, digs decimalSlice, prec int, fmt byte) [
 type decimalSlice struct {
 	d      []byte
 	nd, dp int
-	neg    bool
 }
 
 // %e: -d.ddddde±dd
