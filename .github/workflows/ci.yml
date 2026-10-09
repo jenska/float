@@ -44,7 +44,9 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v7
       with:
-        go-version-file: go.mod
+        # staticcheck v0.8.1 cannot read Go 1.27.2 export data
+        # (dominikh/go-tools#1832); return to go-version-file once fixed
+        go-version: '1.27.1'
 
     - name: Download dependencies
       run: go mod download
