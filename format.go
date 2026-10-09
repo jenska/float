@@ -11,12 +11,17 @@ import "fmt"
 // 'e' (-d.dddde±dd, a decimal exponent),
 // 'E' (-d.ddddE±dd, a decimal exponent),
 // 'f' (-ddd.dddd, no exponent),
+// 'g' ('e' for large exponents, 'f' otherwise),
+// 'G' ('E' for large exponents, 'f' otherwise).
 //
 // The precision prec controls the number of digits (excluding the exponent)
-// printed by the 'e', 'E', 'f' formats.
+// printed by the 'e', 'E', 'f', 'g' and 'G' formats.
 // For 'e', 'E', 'f' it is the number of digits after the decimal point.
+// For 'g' and 'G' it is the maximum number of significant digits (trailing
+// zeros are removed); a negative prec uses 21 digits, enough for any X80 value
+// to round-trip.
 func (a X80) Format(fmt byte, prec int) string {
-	return string(a.genericFtoa(make([]byte, 0, max(int(prec)+4, 24)), fmt, prec))
+	return string(a.genericFtoa(make([]byte, 0, max(prec+4, 24)), fmt, prec))
 }
 
 // Append appends the string form of the floating-point number f,
@@ -26,6 +31,7 @@ func (a X80) Append(dst []byte, fmt byte, prec int) []byte {
 }
 
 func (a X80) genericFtoa(dst []byte, fmt byte, prec int) []byte {
+	a = a.canonical()
 	neg := a.sign()
 	exp := a.exp()
 	mant := a.frac()
@@ -35,7 +41,7 @@ func (a X80) genericFtoa(dst []byte, fmt byte, prec int) []byte {
 		// Inf, NaN
 		var s string
 		switch {
-		case mant != 0:
+		case mant<<1 != 0:
 			s = "NaN"
 		case neg:
 			s = "-Inf"
@@ -62,9 +68,25 @@ func (a X80) genericFtoa(dst []byte, fmt byte, prec int) []byte {
 	return bigFtoa(dst, prec, fmt, neg, mant, exp)
 }
 
+// decimalGuardDigits is the number of digits kept beyond those printed by the
+// 'e' and 'g' formats. Up to ~270 shift passes each truncate the value by less
+// than one unit in the last kept digit, which disturbs at most the last 3
+// guard digits; the printed digits are rounded wrongly only if the exact
+// digits following them are a run of more than 25 nines or zeros.
+const decimalGuardDigits = 30
+
 // bigFtoa uses multiprecision computations to format a float.
 func bigFtoa(dst []byte, prec int, fmt byte, neg bool, mant uint64, exp int) []byte {
 	d := new(decimal)
+	// 'e' and 'g' only need the leading digits. Every shift pass truncates the
+	// digits beyond the limit, so keep enough guard digits that the rounding
+	// digits stay exact; 'f' needs all integer digits.
+	switch fmt {
+	case 'e', 'E':
+		d.max = prec + 1 + decimalGuardDigits
+	case 'g', 'G':
+		d.max = max(prec, 21) + decimalGuardDigits
+	}
 	d.Assign(mant)
 	d.Shift(exp - 63)
 	var digs decimalSlice
@@ -75,6 +97,13 @@ func bigFtoa(dst []byte, prec int, fmt byte, neg bool, mant uint64, exp int) []b
 		d.Round(prec + 1)
 	case 'f':
 		d.Round(d.dp + prec)
+	case 'g', 'G':
+		if prec < 0 {
+			prec = 21
+		} else if prec == 0 {
+			prec = 1
+		}
+		d.Round(prec)
 	}
 	digs = decimalSlice{d: d.d[:], nd: d.nd, dp: d.dp}
 
@@ -87,6 +116,24 @@ func formatDigits(dst []byte, neg bool, digs decimalSlice, prec int, fmt byte) [
 		return fmtE(dst, neg, digs, prec, fmt)
 	case 'f':
 		return fmtF(dst, neg, digs, prec)
+	case 'g', 'G':
+		eprec := prec
+		if eprec > digs.nd && digs.nd >= digs.dp {
+			eprec = digs.nd
+		}
+		// %e is used if the exponent from the conversion
+		// is less than -4 or greater than or equal to the precision.
+		exp := digs.dp - 1
+		if exp < -4 || exp >= eprec {
+			if prec > digs.nd {
+				prec = digs.nd
+			}
+			return fmtE(dst, neg, digs, prec-1, fmt+'e'-'g')
+		}
+		if prec > digs.dp {
+			prec = digs.nd
+		}
+		return fmtF(dst, neg, digs, max(prec-digs.dp, 0))
 	}
 
 	// unknown format
@@ -96,7 +143,6 @@ func formatDigits(dst []byte, neg bool, digs decimalSlice, prec int, fmt byte) [
 type decimalSlice struct {
 	d      []byte
 	nd, dp int
-	neg    bool
 }
 
 // %e: -d.ddddde±dd
@@ -141,14 +187,16 @@ func fmtE(dst []byte, neg bool, d decimalSlice, prec int, fmt byte) []byte {
 	}
 	dst = append(dst, ch)
 
-	// dd or ddd
+	// dd, ddd or dddd
 	switch {
 	case exp < 10:
 		dst = append(dst, '0', byte(exp)+'0')
 	case exp < 100:
 		dst = append(dst, byte(exp/10)+'0', byte(exp%10)+'0')
+	case exp < 1000:
+		dst = append(dst, byte(exp/100)+'0', byte(exp/10%10)+'0', byte(exp%10)+'0')
 	default:
-		dst = append(dst, byte(exp/100)+'0', byte(exp/10)%10+'0', byte(exp%10)+'0')
+		dst = append(dst, byte(exp/1000)+'0', byte(exp/100%10)+'0', byte(exp/10%10)+'0', byte(exp%10)+'0')
 	}
 
 	return dst
@@ -175,7 +223,7 @@ func fmtF(dst []byte, neg bool, d decimalSlice, prec int) []byte {
 	// fraction
 	if prec > 0 {
 		dst = append(dst, '.')
-		for i := 0; i < prec; i++ {
+		for i := range prec {
 			ch := byte('0')
 			if j := d.dp + i; 0 <= j && j < d.nd {
 				ch = d.d[j]
@@ -215,20 +263,7 @@ func (a X80) Internal() string {
 	return fmt.Sprintf("%04X%016X", a.high, a.low)
 }
 
+// String formats a with the 'g' verb and enough digits to round-trip.
 func (a X80) String() string {
-	return a.Format('f', 30)
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
+	return a.Format('g', -1)
 }

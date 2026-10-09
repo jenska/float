@@ -1,5 +1,7 @@
 package float
 
+import "math/bits"
+
 // Shifts `a' right by the number of bits given in `count'.  If any nonzero
 // bits are shifted off, they are “jammed” into the least significant bit of
 // the result by setting the least significant bit to 1.  The value of `count'
@@ -56,7 +58,7 @@ func shift128Right(a0, a1 uint64, count int16) (z0, z1 uint64) {
 		z0 = a0 >> count
 	} else {
 		z1 = 0
-		if count < 64 {
+		if count < 128 {
 			z1 = a0 >> (count & 63)
 		}
 		z0 = 0
@@ -111,8 +113,8 @@ func shortShift128Left(a0, a1 uint64, count int16) (z0, z1 uint64) {
 // 128-bit value formed by concatenating `a0' and `a1'.  Subtraction is modulo
 // 2^128, so any borrow out (carry out) is lost.
 func sub128(a0, a1, b0, b1 uint64) (z0, z1 uint64) {
-	z1 = a1 - b1
-	z0 = a0 - b0 - x1(a1 < b1)
+	z1, borrow := bits.Sub64(a1, b1, 0)
+	z0, _ = bits.Sub64(a0, b0, borrow)
 	return
 }
 
@@ -120,8 +122,8 @@ func sub128(a0, a1, b0, b1 uint64) (z0, z1 uint64) {
 // value formed by concatenating `b0' and `b1'.  Addition is modulo 2^128, so
 // any carry out is lost.
 func add128(a0, a1, b0, b1 uint64) (z0, z1 uint64) {
-	z1 = a1 + b1
-	z0 = a0 + b0 + x1(z1 < a1)
+	z1, carry := bits.Add64(a1, b1, 0)
+	z0, _ = bits.Add64(a0, b0, carry)
 	return
 }
 
@@ -164,22 +166,7 @@ func sub192(a0, a1, a2, b0, b1, b2 uint64) (z0, z1, z2 uint64) {
 
 // Multiplies `a' by `b' to obtain a 128-bit product.
 func mul64To128(a, b uint64) (z0, z1 uint64) {
-	aLow := a & 0xffffffff
-	aHigh := a >> 32
-	bLow := b & 0xffffffff
-	bHigh := b >> 32
-	z1 = aLow * bLow
-	zMiddleA := aLow * bHigh
-	zMiddleB := aHigh * bLow
-	z0 = aHigh * bHigh
-	zMiddleA += zMiddleB
-	z0 += zMiddleA>>32 + x1(zMiddleA < zMiddleB)<<32
-	zMiddleA <<= 32
-	z1 += zMiddleA
-	if z1 < zMiddleA {
-		z0++
-	}
-	return
+	return bits.Mul64(a, b)
 }
 
 // Returns an approximation to the 64-bit integer quotient obtained by dividing
@@ -199,7 +186,7 @@ func estimateDiv128To64(a0, a1, b uint64) uint64 {
 	}
 	term0, term1 := mul64To128(b, z)
 	rem0, rem1 := sub128(a0, a1, term0, term1)
-	for int(rem0) < 0 {
+	for int64(rem0) < 0 {
 		z -= 0x100000000
 		b1 := b << 32
 		rem0, rem1 = add128(rem0, rem1, b0, b1)
@@ -241,11 +228,11 @@ func estimateSqrt32(aExp int32, a uint32) (z uint32) {
 	return uint32((uint64(a)<<31)/uint64(z)) + (z >> 1)
 }
 
-var sqrtOddAdjustments []uint32 = []uint32{
+var sqrtOddAdjustments = [...]uint32{
 	0x0004, 0x0022, 0x005D, 0x00B1, 0x011D, 0x019F, 0x0236, 0x02E0,
 	0x039C, 0x0468, 0x0545, 0x0631, 0x072B, 0x0832, 0x0946, 0x0A67,
 }
-var sqrtEvenAdjustments []uint32 = []uint32{
+var sqrtEvenAdjustments = [...]uint32{
 	0x0A2D, 0x08AF, 0x075A, 0x0629, 0x051A, 0x0429, 0x0356, 0x029E,
 	0x0200, 0x0179, 0x0109, 0x00AF, 0x0068, 0x0034, 0x0012, 0x0002,
 }

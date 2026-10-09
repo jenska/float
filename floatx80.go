@@ -26,11 +26,15 @@
 //	    log.Printf("FP exception: %x", exc)
 //	})
 //
+// Unnormal (nonzero exponent, integer bit clear) and pseudo-denormal (zero
+// exponent, integer bit set) encodings are accepted as operands and
+// normalized, as on the Motorola 68881/68882. For infinities and NaNs the
+// integer bit is ignored.
+//
 // For more examples, see the README.md file.
 package float
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -85,26 +89,31 @@ const (
 )
 
 // Exception Software IEC/IEEE floating-point exception flags.
-var Exception int = 0
+var Exception int
 
 // RoundingPrecision Software IEC/IEEE extended double-precision rounding precision.  Valid
 // values are 32, 64, and 80.
 var RoundingPrecision = 80
 
-// "constants" fpr X80 format
+// "constants" for X80 format, correctly rounded to 64 significand bits
 var (
 	X80Zero     = newFromHexString("00000000000000000000") // 0
 	X80One      = newFromHexString("3FFF8000000000000000") // 1
 	X80MinusOne = newFromHexString("BFFF8000000000000000") // -1
-	X80E        = newFromHexString("4000ADF85458A2BB4800") // e
-	X80Pi       = newFromHexString("4000C90FDAA22168C000") // pi
-	X80Sqrt2    = newFromHexString("BFFFB504F333F9DE6800") // sqrt(2)
-	X80Log2E    = newFromHexString("3FFFB8AA3B295C17F000") // Log2(e)
-	X80Ln2      = newFromHexString("3FFEB17217F7D1CF7800") // Ln(2)
+	X80E        = newFromHexString("4000ADF85458A2BB4A9B") // e
+	X80Pi       = newFromHexString("4000C90FDAA22168C235") // pi
+	X80Sqrt2    = newFromHexString("3FFFB504F333F9DE6484") // sqrt(2)
+	X80Log2E    = newFromHexString("3FFFB8AA3B295C17F0BC") // Log2(e)
+	X80Ln2      = newFromHexString("3FFEB17217F7D1CF79AC") // Ln(2)
 	X80InfPos   = newFromHexString("7FFF8000000000000000") // inf+
 	X80InfNeg   = newFromHexString("FFFF8000000000000000") // inf-
 	X80NaN      = newFromHexString("7FFFC000000000000000") // NaN
 )
+
+// DefaultNaN is the quiet NaN returned by invalid operations such as 0/0,
+// Inf-Inf or Sqrt(-1) when no operand is a NaN. The x87 uses FFFFC000000000000000;
+// the 68881/68882 uses 7FFFFFFFFFFFFFFFFFFF.
+var DefaultNaN = X80NaN
 
 // ExceptionHandler is a function that gets called when a floating-point exception occurs.
 type ExceptionHandler func(exception int)
@@ -157,6 +166,17 @@ func Raise(x int) {
 	}
 }
 
+// captureExceptions runs f with exception reporting suspended and returns the
+// exception flags f raised. The caller's flags and handler are restored.
+func captureExceptions(f func()) int {
+	savedExc, savedHandler := Exception, exceptionHandler
+	Exception, exceptionHandler = 0, nil
+	f()
+	raised := Exception
+	Exception, exceptionHandler = savedExc, savedHandler
+	return raised
+}
+
 // NewFromFloat64 returns the result of converting the double-precision floating-point value
 // `a' to the extended double-precision floating-point format.  The conversion
 // is performed according to the IEC/IEEE Standard for Binary Floating-Point
@@ -165,28 +185,152 @@ func NewFromFloat64(a float64) X80 {
 	return Float64ToFloatX80(a)
 }
 
-// Bytes returns a byte array in byte order LittleEndian or BigEndian of
-// an extended double precision float
+// Bytes returns the 10-byte memory representation of an extended double
+// precision float. With binary.LittleEndian the layout matches the x87
+// (significand first, then sign and exponent); with binary.BigEndian it is the
+// byte-reversed form (sign and exponent first, then significand).
 func (a X80) Bytes(order binary.ByteOrder) []byte {
-	buf := new(bytes.Buffer)
-	if err := binary.Write(buf, order, a); err != nil {
-		panic(err)
+	b := make([]byte, 10)
+	if isLittleEndian(order) {
+		order.PutUint64(b[0:8], a.low)
+		order.PutUint16(b[8:10], a.high)
+	} else {
+		order.PutUint16(b[0:2], a.high)
+		order.PutUint64(b[2:10], a.low)
 	}
-	return buf.Bytes()
+	return b
 }
 
-// NewFromBytes returns a new extended double precision float from a byte array in
-// byte order LittleEndian or BigEndian
+// NewFromBytes returns a new extended double precision float from its 10-byte
+// memory representation, as produced by Bytes. It panics if b is shorter
+// than 10 bytes.
 func NewFromBytes(b []byte, order binary.ByteOrder) X80 {
-	buf := bytes.NewReader(b)
-	var result X80
-	if err := binary.Read(buf, order, result); err != nil {
-		panic(err)
+	if len(b) < 10 {
+		panic(fmt.Errorf("float: NewFromBytes needs 10 bytes, got %d", len(b)))
 	}
-	return result
+	if isLittleEndian(order) {
+		return X80{high: order.Uint16(b[8:10]), low: order.Uint64(b[0:8])}
+	}
+	return X80{high: order.Uint16(b[0:2]), low: order.Uint64(b[2:10])}
 }
 
-// Returns the faction bits
+func isLittleEndian(order binary.ByteOrder) bool {
+	switch order {
+	case binary.LittleEndian:
+		return true
+	case binary.BigEndian:
+		return false
+	}
+	var probe [2]byte
+	order.PutUint16(probe[:], 1)
+	return probe[0] == 1
+}
+
+// NewFromBits returns the X80 value with the given sign/exponent word and
+// 64-bit significand (explicit integer bit in bit 63), without any conversion.
+func NewFromBits(high uint16, low uint64) X80 {
+	return X80{high: high, low: low}
+}
+
+// Bits returns the sign/exponent word and the 64-bit significand of a.
+func (a X80) Bits() (high uint16, low uint64) {
+	return a.high, a.low
+}
+
+// Bytes96 returns the 12-byte memory representation of a, which pads the
+// 10-byte value with a zero word. With binary.BigEndian this is the 68881/68882
+// extended format (sign and exponent, zero padding, significand); with
+// binary.LittleEndian it is the x87 12-byte long double (significand, sign and
+// exponent, zero padding).
+func (a X80) Bytes96(order binary.ByteOrder) []byte {
+	b := make([]byte, 12)
+	if isLittleEndian(order) {
+		order.PutUint64(b[0:8], a.low)
+		order.PutUint16(b[8:10], a.high)
+	} else {
+		order.PutUint16(b[0:2], a.high)
+		order.PutUint64(b[4:12], a.low)
+	}
+	return b
+}
+
+// NewFromBytes96 returns a new extended double precision float from its 12-byte
+// memory representation, as produced by Bytes96. The padding word is ignored.
+// It panics if b is shorter than 12 bytes.
+func NewFromBytes96(b []byte, order binary.ByteOrder) X80 {
+	if len(b) < 12 {
+		panic(fmt.Errorf("float: NewFromBytes96 needs 12 bytes, got %d", len(b)))
+	}
+	if isLittleEndian(order) {
+		return NewFromBytes(b[0:10], order)
+	}
+	return X80{high: order.Uint16(b[0:2]), low: order.Uint64(b[4:12])}
+}
+
+// canonical returns a with unnormal and pseudo-denormal encodings normalized
+// and the integer bit of infinities and NaNs set, so that the arithmetic
+// routines only ever see canonical encodings.
+func (a X80) canonical() X80 {
+	exp := a.exp()
+	switch {
+	case exp == 0x7FFF:
+		a.low |= 1 << 63
+	case exp == 0:
+		if a.low>>63 != 0 { // pseudo-denormal: same value as exponent 1
+			a.high++
+		}
+	case a.low>>63 == 0: // unnormal
+		if a.low == 0 {
+			return packFloatX80(a.sign(), 0, 0)
+		}
+		shift := bits.LeadingZeros64(a.low)
+		if shift >= exp {
+			return packFloatX80(a.sign(), 0, a.low<<(exp-1))
+		}
+		return packFloatX80(a.sign(), exp-shift, a.low<<shift)
+	}
+	return a
+}
+
+// Normalize returns the canonical encoding of a: unnormals and
+// pseudo-denormals are normalized and the integer bit of infinities and NaNs
+// is set. The value is unchanged and no exception is raised.
+func (a X80) Normalize() X80 {
+	return a.canonical()
+}
+
+// IsZero reports whether a is +0 or -0.
+func (a X80) IsZero() bool {
+	a = a.canonical()
+	return a.exp() == 0 && a.low == 0
+}
+
+// IsSubnormal reports whether a is a nonzero denormalized number.
+func (a X80) IsSubnormal() bool {
+	a = a.canonical()
+	return a.exp() == 0 && a.low != 0
+}
+
+// Signbit reports whether the sign bit of a is set, including for -0 and NaNs.
+func (a X80) Signbit() bool {
+	return a.sign()
+}
+
+// Abs returns a with the sign bit cleared. Like the IEEE 754 abs operation it
+// only changes the sign bit: NaNs are not quieted and no exception is raised.
+func (a X80) Abs() X80 {
+	a.high &^= 0x8000
+	return a
+}
+
+// Neg returns a with the sign bit flipped. Like the IEEE 754 negate operation
+// it only changes the sign bit: NaNs are not quieted and no exception is raised.
+func (a X80) Neg() X80 {
+	a.high ^= 0x8000
+	return a
+}
+
+// Returns the fraction bits
 func (a X80) frac() uint64 {
 	return a.low
 }
@@ -253,7 +397,7 @@ func (a X80) IsSignalingNaN() bool {
 
 // IsInf returns true if the value is positive or negative infinity, otherwise false
 func (a X80) IsInf() bool {
-	return (a.high&0x7fff) == 0x7fff && a.low == 0x8000000000000000
+	return (a.high&0x7fff) == 0x7fff && a.low<<1 == 0
 }
 
 // Takes an abstract floating-point value having sign `zSign', exponent `zExp',
@@ -318,7 +462,7 @@ func roundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zS
 		roundBits := zSig0 & roundMask
 		if 0x7FFD <= uint32(zExp-1) {
 			if 0x7FFE < zExp || ((zExp == 0x7FFE) && (zSig0+uint64(roundIncrement) < zSig0)) {
-				return overflow(uint64(roundingMode))
+				return overflow(roundMask)
 			}
 			if zExp <= 0 {
 				isTiny := DetectTininess == TininessBeforeRounding || zExp < 0 || zSig0 <= zSig0+roundIncrement
@@ -645,14 +789,16 @@ func roundAndPackFloat64(zSign bool, zExp int16, zSig uint64) float64 {
 	if 0x7FD <= uint16(zExp) {
 		if 0x7FD < zExp || (zExp == 0x7FD && int64(zSig)+roundIncrement < 0) {
 			Raise(ExceptionOverflow | ExceptionInexact)
-			result := packFloat64(zSign, 0x7FF, 0)
+			bits := math.Float64bits(packFloat64(zSign, 0x7FF, 0))
 			if roundIncrement == 0 {
-				return result - 1
+				bits-- // largest finite value
 			}
-			return result
+			return math.Float64frombits(bits)
 		}
 		if zExp < 0 {
-			isTiny := DetectTininess == TininessBeforeRounding || zExp < -1
+			isTiny := DetectTininess == TininessBeforeRounding ||
+				zExp < -1 ||
+				uint64(int64(zSig)+roundIncrement) < 0x8000000000000000
 			zSig = shift64RightJamming(zSig, -zExp)
 			zExp = 0
 			roundBits = zSig & 0x3FF
@@ -666,10 +812,78 @@ func roundAndPackFloat64(zSign bool, zExp int16, zSig uint64) float64 {
 	}
 	zSig = uint64(int64(zSig)+roundIncrement) >> 10
 	if (roundBits^0x200) == 0 && roundNearestEven {
-		zSig &= uint64(1)
+		zSig &^= 1
 	}
 	if zSig == 0 {
 		zExp = 0
 	}
 	return packFloat64(zSign, zExp, zSig)
+}
+
+// Packs the sign `zSign', exponent `zExp', and significand `zSig' into a
+// single-precision floating-point value, returning the result.  As with
+// packFloat64, any integer portion of `zSig' is added into the exponent.
+func packFloat32(zSign bool, zExp int16, zSig uint32) float32 {
+	return math.Float32frombits(uint32(x1(zSign))<<31 + uint32(zExp)<<23 + zSig)
+}
+
+// Takes an abstract floating-point value having sign `zSign', exponent `zExp',
+// and significand `zSig', and returns the proper single-precision floating-
+// point value corresponding to the abstract input.  This is the single-
+// precision counterpart of roundAndPackFloat64: the input significand `zSig'
+// has its binary point between bits 30 and 29, which is 7 bits to the left of
+// the usual location.
+func roundAndPackFloat32(zSign bool, zExp int16, zSig uint32) float32 {
+	roundingMode := RoundingMode
+	roundNearestEven := roundingMode == RoundNearestEven
+	roundIncrement := int32(0x40)
+	if !roundNearestEven {
+		if roundingMode == RoundToZero {
+			roundIncrement = 0
+		} else {
+			roundIncrement = 0x7F
+			if zSign {
+				if roundingMode == RoundUp {
+					roundIncrement = 0
+				}
+			} else {
+				if roundingMode == RoundDown {
+					roundIncrement = 0
+				}
+			}
+		}
+	}
+	roundBits := zSig & 0x7F
+	if 0xFD <= uint16(zExp) {
+		if 0xFD < zExp || (zExp == 0xFD && int32(zSig)+roundIncrement < 0) {
+			Raise(ExceptionOverflow | ExceptionInexact)
+			bits := math.Float32bits(packFloat32(zSign, 0xFF, 0))
+			if roundIncrement == 0 {
+				bits-- // largest finite value
+			}
+			return math.Float32frombits(bits)
+		}
+		if zExp < 0 {
+			isTiny := DetectTininess == TininessBeforeRounding ||
+				zExp < -1 ||
+				uint32(int32(zSig)+roundIncrement) < 0x80000000
+			zSig = uint32(shift64RightJamming(uint64(zSig), -zExp))
+			zExp = 0
+			roundBits = zSig & 0x7F
+			if isTiny && roundBits != 0 {
+				Raise(ExceptionUnderflow)
+			}
+		}
+	}
+	if roundBits != 0 {
+		Raise(ExceptionInexact)
+	}
+	zSig = uint32(int32(zSig)+roundIncrement) >> 7
+	if (roundBits^0x40) == 0 && roundNearestEven {
+		zSig &^= 1
+	}
+	if zSig == 0 {
+		zExp = 0
+	}
+	return packFloat32(zSign, zExp, zSig)
 }

@@ -5,6 +5,7 @@ package float
 // value.  The operation is performed according to the IEC/IEEE Standard for
 // Binary Floating-Point Arithmetic.
 func (a X80) RoundToInt() X80 {
+	a = a.canonical()
 	aExp := a.exp()
 	if 0x403E <= aExp {
 		if aExp == 0x7FFF && a.frac()<<1 != 0 {
@@ -65,6 +66,7 @@ func (a X80) RoundToInt() X80 {
 // values `a' and `b'.  The operation is performed according to the IEC/IEEE
 // Standard for Binary Floating-Point Arithmetic.
 func (a X80) Add(b X80) X80 {
+	a, b = a.canonical(), b.canonical()
 	aSign, bSign := a.sign(), b.sign()
 	if aSign == bSign {
 		return addFloatx80Sigs(a, b, aSign)
@@ -76,6 +78,7 @@ func (a X80) Add(b X80) X80 {
 // point values `a' and `b'.  The operation is performed according to the
 // IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 func (a X80) Sub(b X80) X80 {
+	a, b = a.canonical(), b.canonical()
 	aSign, bSign := a.sign(), b.sign()
 	if aSign == bSign {
 		return subFloatx80Sigs(a, b, aSign)
@@ -169,7 +172,7 @@ func subFloatx80Sigs(a, b X80, zSign bool) X80 {
 			return propagateFloatX80NaN(a, b)
 		}
 		Raise(ExceptionInvalid)
-		return X80NaN
+		return DefaultNaN
 	}
 	if aExp == 0 {
 		aExp, bExp = 1, 1
@@ -222,6 +225,19 @@ normalizeRoundAndPack:
 // point values `a' and `b'.  The operation is performed according to the
 // IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 func (a X80) Mul(b X80) X80 {
+	return mulFloatX80(a.canonical(), b.canonical(), RoundingPrecision, false)
+}
+
+// SglMul returns the product of `a' and `b' in single precision: the
+// significands of both operands are truncated to 24 bits and the product is
+// rounded to 24 bits, while the exponent keeps the extended range.  The
+// RoundingPrecision setting is ignored.  This is the 68881/68882 FSGLMUL
+// operation.
+func (a X80) SglMul(b X80) X80 {
+	return mulFloatX80(a.canonical(), b.canonical(), 32, true)
+}
+
+func mulFloatX80(a, b X80, prec int, sgl bool) X80 {
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	bSig, bExp, bSign := b.frac(), b.exp(), b.sign()
 	zSign := aSign != bSign
@@ -232,7 +248,7 @@ func (a X80) Mul(b X80) X80 {
 		}
 		if bExp == 0 && bSig == 0 {
 			Raise(ExceptionInvalid)
-			return X80NaN
+			return DefaultNaN
 		}
 		return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)
 	}
@@ -243,7 +259,7 @@ func (a X80) Mul(b X80) X80 {
 		}
 		if aExp == 0 && aSig == 0 {
 			Raise(ExceptionInvalid)
-			return X80NaN
+			return DefaultNaN
 		}
 		return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)
 	}
@@ -259,19 +275,34 @@ func (a X80) Mul(b X80) X80 {
 		}
 		bExp, bSig = normalizeFloatX80Subnormal(bSig)
 	}
+	if sgl {
+		aSig &= 0xFFFFFF0000000000
+		bSig &= 0xFFFFFF0000000000
+	}
 	zExp := aExp + bExp - 0x3FFE
 	zSig0, zSig1 := mul64To128(aSig, bSig)
-	if 0 < zSig0 {
+	if int64(zSig0) > 0 {
 		zSig0, zSig1 = shortShift128Left(zSig0, zSig1, 1)
 		zExp--
 	}
-	return roundAndPackFloatX80(RoundingPrecision, zSign, zExp, zSig0, zSig1)
+	return roundAndPackFloatX80(prec, zSign, zExp, zSig0, zSig1)
 }
 
 // Div returns the result of dividing the extended double-precision floating-point
 // value `a' by the corresponding value `b'.  The operation is performed
 // according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 func (a X80) Div(b X80) X80 {
+	return divFloatX80(a.canonical(), b.canonical(), RoundingPrecision)
+}
+
+// SglDiv returns the quotient of `a' and `b' rounded to single precision,
+// while the exponent keeps the extended range.  The RoundingPrecision setting
+// is ignored.  This is the 68881/68882 FSGLDIV operation.
+func (a X80) SglDiv(b X80) X80 {
+	return divFloatX80(a.canonical(), b.canonical(), 32)
+}
+
+func divFloatX80(a, b X80, prec int) X80 {
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	bSig, bExp, bSign := b.frac(), b.exp(), b.sign()
 	zSign := aSign != bSign
@@ -284,7 +315,7 @@ func (a X80) Div(b X80) X80 {
 				return propagateFloatX80NaN(a, b)
 			}
 			Raise(ExceptionInvalid)
-			return X80NaN
+			return DefaultNaN
 		}
 		return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)
 	}
@@ -296,9 +327,9 @@ func (a X80) Div(b X80) X80 {
 	}
 	if bExp == 0 {
 		if bSig == 0 {
-			if aExp != 0 && aSig != 0 {
+			if aExp == 0 && aSig == 0 {
 				Raise(ExceptionInvalid)
-				return X80NaN
+				return DefaultNaN
 			}
 			Raise(ExceptionDivbyzero)
 			return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)
@@ -332,69 +363,105 @@ func (a X80) Div(b X80) X80 {
 			zSig1--
 			rem1, rem2 = add128(rem1, rem2, 0, bSig)
 		}
-		if rem1 != 0 && rem2 != 0 {
+		if rem1|rem2 != 0 {
 			zSig1 |= 1
 		}
 	}
-	return roundAndPackFloatX80(RoundingPrecision, zSign, zExp, zSig0, zSig1)
+	return roundAndPackFloatX80(prec, zSign, zExp, zSig0, zSig1)
 }
 
-// Rem returns the remainder of the extended double-precision floating-point value
-// `a' with respect to the corresponding value `b'.  The operation is performed
-// according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
+// Rem returns the IEEE remainder of `a' with respect to `b': a - n*b where n
+// is the integer nearest to a/b, ties to even.  The result is exact.  This is
+// the 68881/68882 FREM operation.
 func (a X80) Rem(b X80) X80 {
+	z, _ := remFloatX80(a, b, false)
+	return z
+}
+
+// RemQuo returns Rem(b) together with the low-order bits of the quotient n:
+// quo has the sign of a/b and its magnitude is congruent to |n| modulo 2^31.
+// The 68881/68882 quotient byte is the sign and the low 7 bits of quo.
+func (a X80) RemQuo(b X80) (z X80, quo int) {
+	return remFloatX80(a, b, false)
+}
+
+// Mod returns the truncated remainder of `a' with respect to `b': a - n*b
+// where n is a/b rounded toward zero.  The result has the sign of `a' and is
+// exact.  This is the C fmod function and the 68881/68882 FMOD operation.
+func (a X80) Mod(b X80) X80 {
+	z, _ := a.ModQuo(b)
+	return z
+}
+
+// ModQuo returns Mod(b) together with the low-order bits of the truncated
+// quotient, in the same form as RemQuo.
+func (a X80) ModQuo(b X80) (z X80, quo int) {
+	return remFloatX80(a, b, true)
+}
+
+// remFloatX80 computes the remainder of `a' with respect to `b' and the low
+// 64 bits of the quotient, which is rounded to nearest-even, or toward zero
+// if `truncate' is set.
+func remFloatX80(a, b X80, truncate bool) (X80, int) {
+	a, b = a.canonical(), b.canonical()
 	aSig0, aExp, aSign := a.frac(), a.exp(), a.sign()
-	bSig, bExp := b.frac(), b.exp()
+	bSig, bExp, bSign := b.frac(), b.exp(), b.sign()
 	var term0, term1, q uint64
 
 	if aExp == 0x7FFF {
 		if aSig0<<1 != 0 || (bExp == 0x7FFF && bSig<<1 != 0) {
-			return propagateFloatX80NaN(a, b)
+			return propagateFloatX80NaN(a, b), 0
 		}
 		Raise(ExceptionInvalid)
-		return X80NaN
+		return DefaultNaN, 0
 	}
 	if bExp == 0x7FFF {
 		if bSig<<1 != 0 {
-			return propagateFloatX80NaN(a, b)
+			return propagateFloatX80NaN(a, b), 0
 		}
-		return a
+		return a, 0
 	}
 	if bExp == 0 {
 		if bSig == 0 {
 			Raise(ExceptionInvalid)
-			return X80NaN
+			return DefaultNaN, 0
 		}
 		bExp, bSig = normalizeFloatX80Subnormal(bSig)
 	}
 	if aExp == 0 {
-		if aSig0<<1 == 0 {
-			return a
+		if aSig0 == 0 {
+			return a, 0
 		}
 		aExp, aSig0 = normalizeFloatX80Subnormal(aSig0)
 	}
-	bSig |= 0x8000000000000000
 	zSign := aSign
 	expDiff := aExp - bExp
 	aSig1 := uint64(0)
 	if expDiff < 0 {
 		if expDiff < -1 {
-			return a
+			return a, 0
 		}
 		aSig0, aSig1 = shift128Right(aSig0, 0, 1)
 		expDiff = 0
 	}
-	if bSig <= aSig0 {
+	// The quotient is assembled from partial quotients: the first is one bit,
+	// the loop yields 64 and then 62 new bits per step, the last step expDiff.
+	q = x1(bSig <= aSig0)
+	if q != 0 {
 		aSig0 -= bSig
 	}
+	quo := q
+	shift := 64
 	expDiff -= 64
 	for 0 < expDiff {
-		q := estimateDiv128To64(aSig0, aSig1, bSig)
+		q = estimateDiv128To64(aSig0, aSig1, bSig)
 		if 2 < q {
 			q -= 2
 		} else {
 			q = 0
 		}
+		quo = quo<<shift + q
+		shift = 62
 		term0, term1 = mul64To128(bSig, q)
 		aSig0, aSig1 = sub128(aSig0, aSig1, term0, term1)
 		aSig0, aSig1 = shortShift128Left(aSig0, aSig1, 62)
@@ -402,7 +469,7 @@ func (a X80) Rem(b X80) X80 {
 	}
 	expDiff += 64
 	if 0 < expDiff {
-		q := estimateDiv128To64(aSig0, aSig1, bSig)
+		q = estimateDiv128To64(aSig0, aSig1, bSig)
 		if 2 < q {
 			q -= 2
 		} else {
@@ -416,25 +483,137 @@ func (a X80) Rem(b X80) X80 {
 			q++
 			aSig0, aSig1 = sub128(aSig0, aSig1, term0, term1)
 		}
+		quo = quo<<(expDiff-64+shift) + q
 	} else {
 		term1 = 0
 		term0 = bSig
 	}
-	alternateASig0, alternateASig1 := sub128(term0, term1, aSig0, aSig1)
-	if lt128(alternateASig0, alternateASig1, aSig0, aSig1) ||
-		eq128(alternateASig0, alternateASig1, aSig0, aSig1) &&
-			(q&1) != 0 {
-		aSig0 = alternateASig0
-		aSig1 = alternateASig1
-		zSign = !zSign
+	if !truncate {
+		alternateASig0, alternateASig1 := sub128(term0, term1, aSig0, aSig1)
+		if lt128(alternateASig0, alternateASig1, aSig0, aSig1) ||
+			eq128(alternateASig0, alternateASig1, aSig0, aSig1) &&
+				(q&1) != 0 {
+			aSig0 = alternateASig0
+			aSig1 = alternateASig1
+			zSign = !zSign
+			quo++
+		}
 	}
-	return normalizeRoundAndPackFloatX80(80, zSign, bExp+expDiff, aSig0, aSig1)
+	n := int(quo & 0x7FFFFFFF)
+	if aSign != bSign {
+		n = -n
+	}
+	return normalizeRoundAndPackFloatX80(80, zSign, bExp+expDiff, aSig0, aSig1), n
+}
+
+// Scale returns `a' * 2^n, rounded according to the current rounding mode and
+// precision, with overflow and underflow handled as for any other operation.
+// This is the C scalbn function and the 68881/68882 FSCALE operation.
+func (a X80) Scale(n int) X80 {
+	a = a.canonical()
+	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
+	if aExp == 0x7FFF {
+		if aSig<<1 != 0 {
+			return propagateFloatX80NaN(a, a)
+		}
+		return a
+	}
+	if aExp == 0 {
+		if aSig == 0 {
+			return a
+		}
+		aExp, aSig = normalizeFloatX80Subnormal(aSig)
+	}
+	// beyond these limits the result over- or underflows anyway; the clamp
+	// keeps the exponent within what roundAndPackFloatX80 can shift
+	zExp := aExp + max(min(n, 0x10000), -0x10000)
+	zExp = max(zExp, -0x7000)
+	return roundAndPackFloatX80(RoundingPrecision, aSign, zExp, aSig, 0)
+}
+
+// GetExp returns the unbiased binary exponent of `a' as an X80 value, so that
+// a = GetMan(a) * 2^GetExp(a) for finite nonzero `a'.  Subnormal values are
+// normalized first.  GetExp(±0) = ±0; GetExp(±Inf) raises the invalid
+// exception and returns DefaultNaN.  This is the 68881/68882 FGETEXP operation.
+func (a X80) GetExp() X80 {
+	a = a.canonical()
+	aSig, aExp := a.frac(), a.exp()
+	if aExp == 0x7FFF {
+		if aSig<<1 != 0 {
+			return propagateFloatX80NaN(a, a)
+		}
+		Raise(ExceptionInvalid)
+		return DefaultNaN
+	}
+	if aExp == 0 {
+		if aSig == 0 {
+			return a
+		}
+		aExp, _ = normalizeFloatX80Subnormal(aSig)
+	}
+	return Int32ToFloatX80(int32(aExp - 0x3FFF))
+}
+
+// GetMan returns the significand of `a' scaled to 1 <= |m| < 2, with the sign
+// of `a'.  Subnormal values are normalized first.  GetMan(±0) = ±0;
+// GetMan(±Inf) raises the invalid exception and returns DefaultNaN.  This is
+// the 68881/68882 FGETMAN operation.
+func (a X80) GetMan() X80 {
+	a = a.canonical()
+	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
+	if aExp == 0x7FFF {
+		if aSig<<1 != 0 {
+			return propagateFloatX80NaN(a, a)
+		}
+		Raise(ExceptionInvalid)
+		return DefaultNaN
+	}
+	if aExp == 0 {
+		if aSig == 0 {
+			return a
+		}
+		_, aSig = normalizeFloatX80Subnormal(aSig)
+	}
+	return packFloatX80(aSign, 0x3FFF, aSig)
+}
+
+// RoundToPrecision rounds `a' to `prec' significand bits, which is 32 (24
+// bits, single), 64 (53 bits, double) or 80 (64 bits, full extended), using
+// the current rounding mode.  The exponent keeps the extended range.  It is
+// how a value is brought to the precision selected in the 68881/68882 FPCR.
+func (a X80) RoundToPrecision(prec int) X80 {
+	a = a.canonical()
+	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
+	if aExp == 0x7FFF {
+		if aSig<<1 != 0 {
+			return propagateFloatX80NaN(a, a)
+		}
+		return a
+	}
+	if aSig == 0 {
+		return a
+	}
+	if aExp == 0 {
+		aExp, aSig = normalizeFloatX80Subnormal(aSig)
+	}
+	return roundAndPackFloatX80(prec, aSign, aExp, aSig, 0)
+}
+
+// Trunc rounds `a' to an integer toward zero, regardless of the current
+// rounding mode.  This is the 68881/68882 FINTRZ operation; RoundToInt is FINT.
+func (a X80) Trunc() X80 {
+	saved := RoundingMode
+	RoundingMode = RoundToZero
+	z := a.RoundToInt()
+	RoundingMode = saved
+	return z
 }
 
 // Sqrt returns the square root of the extended double-precision floating-point
 // value `a'.  The operation is performed according to the IEC/IEEE Standard
 // for Binary Floating-Point Arithmetic.
 func (a X80) Sqrt() X80 {
+	a = a.canonical()
 	aSig0, aExp, aSign := a.frac(), a.exp(), a.sign()
 	var aSig1 uint64
 	if aExp == 0x7FFF {
@@ -445,14 +624,14 @@ func (a X80) Sqrt() X80 {
 			return a
 		}
 		Raise(ExceptionInvalid)
-		return X80NaN
+		return DefaultNaN
 	}
 	if aSign {
-		if aExp != 0 && aSig0 != 0 {
+		if aExp == 0 && aSig0 == 0 {
 			return a
 		}
 		Raise(ExceptionInvalid)
-		return X80NaN
+		return DefaultNaN
 	}
 	if aExp == 0 {
 		if aSig0 == 0 {
@@ -495,97 +674,4 @@ func (a X80) Sqrt() X80 {
 	zSig0, zSig1 = shortShift128Left(0, zSig1, 1)
 	zSig0 |= doubleZSig0
 	return roundAndPackFloatX80(RoundingPrecision, false, zExp, zSig0, zSig1)
-}
-
-// Ln returns the natural logarithm of the extended double-precision floating-point value `a'.
-// The operation is performed using a series expansion for ln(1+x).
-func (a X80) Ln() X80 {
-	if a.IsNaN() || a.sign() {
-		Raise(ExceptionInvalid)
-		return X80NaN
-	}
-	if a.Eq(X80Zero) {
-		Raise(ExceptionDivbyzero)
-		return X80InfNeg
-	}
-	if a.Eq(X80One) {
-		return X80Zero
-	}
-	if a.IsInf() {
-		return X80InfPos
-	}
-
-	// Reduce to [1, 2)
-	exp := 0
-	x := a
-	two := newFromHexString("40008000000000000000") // 2
-	for x.Gt(two) {                                 // > 2
-		x = x.Div(two) // / 2
-		exp++
-	}
-	for x.Lt(X80One) { // < 1
-		x = x.Mul(two) // * 2
-		exp--
-	}
-
-	// Now x is in [1, 2), compute ln(x) using series ln(1+y) where y = x - 1
-	y := x.Sub(X80One)
-	result := X80Zero
-	term := y
-	sign := X80One
-	for i := 1; i <= 20; i++ {
-		result = result.Add(term.Div(Int64ToFloatX80(int64(i))).Mul(sign))
-		term = term.Mul(y)
-		sign = sign.Mul(X80MinusOne)
-	}
-
-	// Add exp * ln(2)
-	if exp != 0 {
-		result = result.Add(Int64ToFloatX80(int64(exp)).Mul(X80Ln2))
-	}
-
-	return result
-}
-
-// Atan returns the arctangent of the extended double-precision floating-point value `a'.
-// The operation is performed using a series expansion.
-func (a X80) Atan() X80 {
-	if a.IsNaN() {
-		return X80NaN
-	}
-	if a.IsInf() {
-		if a.sign() {
-			return X80Pi.Mul(X80MinusOne).Div(Int64ToFloatX80(2))
-		}
-		return X80Pi.Div(Int64ToFloatX80(2))
-	}
-
-	absA := a
-	if a.sign() {
-		absA = a.Mul(X80MinusOne)
-	}
-
-	var result X80
-	if absA.Gt(X80One) {
-		// For |x| > 1, atan(x) = pi/2 - atan(1/x)
-		invA := X80One.Div(absA)
-		result = X80Pi.Div(Int64ToFloatX80(2)).Sub(invA.Atan())
-	} else {
-		// Series: atan(x) = x - x^3/3 + x^5/5 - x^7/7 + ...
-		result = X80Zero
-		term := absA
-		x2 := absA.Mul(absA)
-		sign := X80One
-		for i := 1; i <= 15; i += 2 {
-			result = result.Add(term.Div(Int64ToFloatX80(int64(i))).Mul(sign))
-			term = term.Mul(x2)
-			sign = sign.Mul(X80MinusOne)
-		}
-	}
-
-	if a.sign() {
-		result = result.Mul(X80MinusOne)
-	}
-
-	return result
 }

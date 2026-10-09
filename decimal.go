@@ -17,8 +17,17 @@ type decimal struct {
 	d     [800]byte // digits, big-endian representation
 	nd    int       // number of digits used
 	dp    int       // decimal point
-	neg   bool      // negative flag
 	trunc bool      // discarded nonzero digits beyond d[:nd]
+	max   int       // number of digits to keep, if nonzero and below len(d)
+}
+
+// limit returns the number of digits a keeps; digits beyond it are dropped
+// and recorded in trunc.
+func (a *decimal) limit() int {
+	if a.max > 0 && a.max < len(a.d) {
+		return a.max
+	}
+	return len(a.d)
 }
 
 func (a *decimal) String() string {
@@ -105,11 +114,11 @@ func (a *decimal) Assign(v uint64) {
 
 // Maximum shift that we can do in one pass without overflow.
 // A uint has 32 or 64 bits, and we have to be able to accommodate 9<<k.
-const uintSize = 32 << (^uint(0) >> 63)
-const maxShift = uintSize - 4
+const maxShift = bits.UintSize - 4
 
 // Binary shift right (/ 2) by k bits.  k <= maxShift to avoid overflow.
 func rightShift(a *decimal, k uint) {
+	lim := a.limit()
 	r := 0 // read pointer
 	w := 0 // write pointer
 
@@ -149,7 +158,7 @@ func rightShift(a *decimal, k uint) {
 	for n > 0 {
 		dig := n >> k
 		n &= mask
-		if w < len(a.d) {
+		if w < lim {
 			a.d[w] = byte(dig + '0')
 			w++
 		} else if dig > 0 {
@@ -269,6 +278,7 @@ func prefixIsLessThan(b []byte, s string) bool {
 
 // Binary shift left (* 2) by k bits.  k <= maxShift to avoid overflow.
 func leftShift(a *decimal, k uint) {
+	lim := a.limit()
 	delta := leftcheats[k].delta
 	if prefixIsLessThan(a.d[0:a.nd], leftcheats[k].cutoff) {
 		delta--
@@ -284,7 +294,7 @@ func leftShift(a *decimal, k uint) {
 		quo := n / 10
 		rem := n - 10*quo
 		w--
-		if w < len(a.d) {
+		if w < lim {
 			a.d[w] = byte(rem + '0')
 		} else if rem != 0 {
 			a.trunc = true
@@ -297,7 +307,7 @@ func leftShift(a *decimal, k uint) {
 		quo := n / 10
 		rem := n - 10*quo
 		w--
-		if w < len(a.d) {
+		if w < lim {
 			a.d[w] = byte(rem + '0')
 		} else if rem != 0 {
 			a.trunc = true
@@ -306,8 +316,8 @@ func leftShift(a *decimal, k uint) {
 	}
 
 	a.nd += delta
-	if a.nd >= len(a.d) {
-		a.nd = len(a.d)
+	if a.nd >= lim {
+		a.nd = lim
 	}
 	a.dp += delta
 	trim(a)
@@ -407,7 +417,7 @@ const smallsString = "00010203040506070809" +
 	"80818283848586878889" +
 	"90919293949596979899"
 
-const host32bit = ^uint(0)>>32 == 0
+const host32bit = bits.UintSize == 32
 
 const digits = "0123456789abcdefghijklmnopqrstuvwxyz"
 

@@ -127,7 +127,7 @@ func TestFloat64ToFloatX80(t *testing.T) {
 		{"-0.33333", -0.33333, newFromHexString("BFFDAAAA3AD18D25F000")},
 		{"inf+", math.Inf(1), X80InfPos},
 		{"inf-", math.Inf(-1), X80InfNeg},
-		{"pi", math.Pi, X80Pi},
+		{"pi", math.Pi, newFromHexString("4000C90FDAA22168C000")}, // float64 pi, exactly
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

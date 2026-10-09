@@ -13,11 +13,11 @@ This package is derived from the original SoftFloat package and was implemented 
 ## Installation
 
 ```bash
-go get github.com/jenska/float@v1.0.0
+go get github.com/jenska/float@v1.1.0
 ```
 
 ### Requirements
-- Go 1.22 or later
+- Go 1.27 or later
 
 ## Development
 
@@ -41,6 +41,7 @@ make clean
 ```
 
 ### Available Make Targets
+
 - `make all` - Run fmt, vet, and test
 - `make build` - Verify the project compiles
 - `make test` - Run all tests
@@ -52,76 +53,17 @@ make clean
 - `make dev` - Development workflow
 - `make ci` - CI workflow
 
-## CI/CD
-
-This project uses GitHub Actions for continuous integration and deployment:
-
-### Workflows
-
-- **CI** (`.github/workflows/ci.yml`): Runs on every push and PR
-  - Tests on multiple Go versions (1.21, 1.22, 1.23)
-  - Tests on multiple platforms (Linux, macOS, Windows)
-  - Runs linting and static analysis
-  - Generates and uploads coverage reports
-  - Validates builds
-
-- **Release** (`.github/workflows/release.yml`): Runs on version tags
-  - Creates GitHub releases
-  - Generates release artifacts
-  - Publishes coverage reports
-
-- **CodeQL** (`.github/workflows/codeql.yml`): Security analysis
-  - Runs weekly and on pushes/PRs
-  - Performs security and quality analysis
-
-- **Dependabot** (`.github/dependabot.yml`): Automated dependency updates
-  - Weekly Go module updates
-  - Weekly GitHub Actions updates
-
-### Status Badges
-
-Add these badges to your README:
-
-```markdown
-[![CI](https://github.com/jenska/float/actions/workflows/ci.yml/badge.svg)](https://github.com/jenska/float/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/jenska/float)](https://goreportcard.com/report/github.com/jenska/float)
-[![codecov](https://codecov.io/gh/jenska/float/branch/main/graph/badge.svg)](https://codecov.io/gh/jenska/float)
-[![Go Reference](https://pkg.go.dev/badge/github.com/jenska/float.svg)](https://pkg.go.dev/github.com/jenska/float)
-```
-
-```go
-package main
-
-import (
-    "fmt"
-    "github.com/jenska/float"
-)
-
-func main() {
-    // Create extended precision values
-    a := float.X80Pi
-    b := float.NewFromFloat64(2.0)
-
-    // Perform calculations with higher precision
-    result := a.Mul(b)
-    fmt.Printf("2π = %s\n", result.String())
-
-    // Use in mathematical computations
-    sqrt2 := float.X80Sqrt2
-    computation := sqrt2.Mul(sqrt2).Sub(float.X80One)
-    fmt.Printf("sqrt(2)² - 1 = %s\n", computation.String())
-}
-```
-
 ## Features
 
-- **Full IEEE 754 Compliance**: Proper handling of 80-bit extended precision
-- **Complete Arithmetic Operations**: Add, Sub, Mul, Div, Rem, Sqrt, Ln, Atan
-- **Type Conversions**: To/from int32, int64, float32, float64
-- **String Formatting**: Binary, decimal, and hexadecimal representations
+- **Full IEEE 754 Compliance**: Correctly rounded basic operations in all four rounding modes and at 32/64/80-bit rounding precision
+- **Complete Arithmetic Operations**: Add, Sub, Mul, Div, Rem, Mod, Sqrt, Scale and more
+- **Transcendental Functions**: Exponentials, logarithms, trigonometric, inverse trigonometric and hyperbolic functions, correctly rounded in practice
+- **Type Conversions**: To/from int8, int16, int32, int64, float32, float64 (also as raw bit patterns) and decimal strings
+- **Motorola 68881/68882 Support**: Every arithmetic operation of the FPU's instruction set, unnormal operands, the 96-bit memory format, constant ROM values and a configurable default NaN, as a basis for FPU emulators
+- **String Formatting**: `'b'`, `'e'`, `'E'`, `'f'`, `'g'`, `'G'` verbs and a raw hexadecimal dump (`Internal`)
 - **Exception Handling**: IEEE 754 exception flags with customizable handlers
 - **High Performance**: Optimized bit-level operations
-- **Thread Safe**: Safe for concurrent use (with proper exception handling)
+- **Not goroutine-safe**: rounding mode, rounding precision and exception flags are package-level state; don't use the package from several goroutines at once
 
 ## Example
 
@@ -135,11 +77,17 @@ import (
 
 func ExampleX80() {
     pi := float.X80Pi
+    fmt.Println(pi)
+    fmt.Println(pi.Format('e', 10))
+
+    // The square of a correctly rounded square root recovers 2*pi exactly here.
     pi2 := pi.Add(pi)
     sqrtpi2 := pi2.Sqrt()
-    epsilon := sqrtpi2.Mul(sqrtpi2).Sub(pi2)
-    fmt.Println(epsilon)
-    // Output: -0.000000000000000000433680868994
+    fmt.Println(sqrtpi2.Mul(sqrtpi2).Sub(pi2))
+    // Output:
+    // 3.14159265358979323851
+    // 3.1415926536e+00
+    // 0
 }
 
 func ExampleExceptionHandling() {
@@ -164,124 +112,96 @@ func ExampleExceptionHandling() {
 
 ## API Reference
 
-### Types
+See the [package documentation](https://pkg.go.dev/github.com/jenska/float) for details.
+The 68881/68882 column names the FPU operation each function implements.
 
-#### X80
+### Environment
 
-The main type representing an 80-bit extended precision floating-point number.
+| Name | Purpose |
+|---|---|
+| `RoundingMode` | `RoundNearestEven`, `RoundToZero`, `RoundDown`, `RoundUp` |
+| `RoundingPrecision` | 80 (64-bit significand), 64 (53 bits) or 32 (24 bits) |
+| `DetectTininess` | `TininessAfterRounding` or `TininessBeforeRounding` |
+| `DefaultNaN` | NaN returned by invalid operations; set to `NewFromBits(0x7FFF, 0xFFFFFFFFFFFFFFFF)` for the 68881/68882 |
+| `Exception`, `GetExceptions`, `HasException`, `ClearExceptions`, ... | Accumulated exception flags `ExceptionInvalid`, `ExceptionDivbyzero`, `ExceptionOverflow`, `ExceptionUnderflow`, `ExceptionInexact` |
+| `SetExceptionHandler` | Callback for every raised exception |
 
-```go
-type X80 struct {
-    high uint16  // Sign (1 bit) + Exponent (15 bits)
-    low  uint64  // Integer bit (1 bit) + Fraction (63 bits)
-}
-```
+### Arithmetic
+
+| Method | Description | 68881/68882 |
+|---|---|---|
+| `Add`, `Sub`, `Mul`, `Div` | Basic operations | FADD, FSUB, FMUL, FDIV |
+| `SglMul`, `SglDiv` | Single-precision multiply and divide with extended exponent range | FSGLMUL, FSGLDIV |
+| `Rem`, `RemQuo` | IEEE remainder, optionally with the low quotient bits | FREM |
+| `Mod`, `ModQuo` | Truncated remainder (C `fmod`), optionally with the low quotient bits | FMOD |
+| `Sqrt` | Square root | FSQRT |
+| `RoundToInt`, `Trunc` | Round to integer with the current mode / toward zero | FINT, FINTRZ |
+| `RoundToPrecision` | Round to 32/64/80-bit precision | FMOVE to a register |
+| `Scale`, `GetExp`, `GetMan` | Multiply by 2^n, extract exponent / significand | FSCALE, FGETEXP, FGETMAN |
+| `Abs`, `Neg` | Sign-bit operations | FABS, FNEG |
+
+### Transcendental Functions
+
+| Method | 68881/68882 | Method | 68881/68882 |
+|---|---|---|---|
+| `Exp`, `Exp2`, `Exp10`, `Expm1` | FETOX, FTWOTOX, FTENTOX, FETOXM1 | `Sin`, `Cos`, `Tan`, `Sincos` | FSIN, FCOS, FTAN, FSINCOS |
+| `Ln`, `Log2`, `Log10`, `Log1p` | FLOGN, FLOG2, FLOG10, FLOGNP1 | `Asin`, `Acos`, `Atan` | FASIN, FACOS, FATAN |
+| `Sinh`, `Cosh`, `Tanh`, `Atanh` | FSINH, FCOSH, FTANH, FATANH | | |
+
+### Comparison and Classification
+
+- `Eq`, `Lt`, `Le`, `Gt`, `Ge` (invalid exception on NaN) and the `...Quiet` variants (invalid only on signaling NaN), `EqSignaling`
+- `IsNaN`, `IsSignalingNaN`, `IsInf`, `IsZero`, `IsSubnormal`, `Signbit`
+- `Normalize` returns the canonical encoding of unnormals and pseudo-denormals
+
+### Conversions
+
+| From X80 | To X80 | 68881/68882 format |
+|---|---|---|
+| `ToInt8`, `ToInt16`, `ToInt32`, `ToInt64` (+ `RoundZero` variants for 32/64) | `Int32ToFloatX80`, `Int64ToFloatX80` | .B, .W, .L |
+| `ToFloat32Bits`, `ToFloat32` | `NewFromFloat32Bits`, `Float32ToFloatX80` | .S |
+| `ToFloat64Bits`, `ToFloat64` | `NewFromFloat64Bits`, `Float64ToFloatX80`, `NewFromFloat64` | .D |
+| `Bytes96` | `NewFromBytes96` | .X (12 bytes) |
+| `Bytes` | `NewFromBytes` | 10-byte x87 format |
+| `Bits` | `NewFromBits` | raw sign/exponent and significand |
+| `Format`, `Append`, `String` | `Parse` | decimal strings, for .P packed decimal |
+
+The `...Bits` conversions preserve NaN payloads and signaling NaNs, which Go's
+`float32`/`float64` handling may not.
 
 ### Constants
 
-#### Predefined Values
-- `X80Zero` - Zero
-- `X80One` - One  
-- `X80MinusOne` - Negative one
-- `X80Pi` - π (3.1415926535897932384626433832795...)
-- `X80E` - e (2.7182818284590452353602874713526...)
-- `X80Ln2` - ln(2)
-- `X80Log2E` - log₂(e)
-- `X80Sqrt2` - √2
-- `X80InfPos` - Positive infinity
-- `X80InfNeg` - Negative infinity
-- `X80NaN` - Not a number
+- `X80Zero`, `X80One`, `X80MinusOne`, `X80InfPos`, `X80InfNeg`, `X80NaN`
+- `X80Pi`, `X80E`, `X80Ln2`, `X80Ln10`, `X80Log2E`, `X80Log10E`, `X80Log10Of2`, `X80Sqrt2`, correctly rounded to nearest
+- `Constant.Value()` rounds `ConstPi`, `ConstE`, `ConstLn2`, `ConstLn10`, `ConstLog2E`, `ConstLog10E` or `ConstLog10Of2` under the current rounding mode and precision
+- `Pow10(n)` returns 10^n correctly rounded
 
-#### Exception Flags
-- `ExceptionInvalid` - Invalid operation
-- `ExceptionDenormal` - Denormalized number
-- `ExceptionDivbyzero` - Division by zero
-- `ExceptionOverflow` - Result too large
-- `ExceptionUnderflow` - Result too small
-- `ExceptionInexact` - Inexact result
-
-#### Rounding Modes
-- `RoundNearestEven` - Round to nearest, ties to even
-- `RoundToZero` - Round toward zero
-- `RoundDown` - Round toward negative infinity
-- `RoundUp` - Round toward positive infinity
-
-### Methods
-
-#### Arithmetic Operations
-- `Add(b X80) X80` - Addition
-- `Sub(b X80) X80` - Subtraction
-- `Mul(b X80) X80` - Multiplication
-- `Div(b X80) X80` - Division
-- `Rem(b X80) X80` - Remainder
-- `Sqrt() X80` - Square root
-- `Ln() X80` - Natural logarithm
-- `Atan() X80` - Arctangent
-
-#### Comparison Operations
-- `Eq(b X80) bool` - Equal
-- `Lt(b X80) bool` - Less than
-- `Le(b X80) bool` - Less than or equal
-- `Gt(b X80) bool` - Greater than
-- `Ge(b X80) bool` - Greater than or equal
-
-#### Conversion Operations
-- `ToInt32() int32` - Convert to 32-bit integer
-- `ToInt64() int64` - Convert to 64-bit integer
-- `ToFloat32() float32` - Convert to 32-bit float
-- `ToFloat64() float64` - Convert to 64-bit float
-- `String() string` - Convert to decimal string
-- `Format(fmt byte, prec int) string` - Formatted string
-
-#### Utility Methods
-- `IsNaN() bool` - Check if NaN
-- `IsInf() bool` - Check if infinity
-- `IsSignalingNaN() bool` - Check if signaling NaN
-
-### Functions
-
-#### Creation Functions
-- `NewFromFloat64(f float64) X80` - Create from float64
-- `NewFromBytes(b []byte, order binary.ByteOrder) X80` - Create from bytes
-- `Int32ToFloatX80(i int32) X80` - Create from int32
-- `Int64ToFloatX80(i int64) X80` - Create from int64
-- `Float32ToFloatX80(f float32) X80` - Create from float32
-- `Float64ToFloatX80(f float64) X80` - Create from float64
-
-#### Exception Handling
-- `SetExceptionHandler(handler ExceptionHandler)` - Set exception callback
-- `GetExceptionHandler() ExceptionHandler` - Get current handler
-- `GetExceptions() int` - Get current exception flags
-- `HasException(flag int) bool` - Check specific exception
-- `HasAnyException() bool` - Check if any exceptions
-- `ClearExceptions()` - Clear all exceptions
-- `ClearException(flag int)` - Clear specific exception
-
-## Supported Operations
-
-- Basic arithmetic: Add, Sub, Mul, Div, Rem
-- Rounding: RoundToInt
-- Square root: Sqrt
-- Logarithm: Ln (natural logarithm)
-- Arctangent: Atan
-- Comparisons: Eq, Lt, Le, Gt, Ge
-- Conversions: to/from int32, int64, float32, float64
-- Formatting: String formatting with various bases
+Together with `X80Zero` these cover the 68881/68882 `FMOVECR` constant ROM.
+Note that the ROM stores log10(2) as `3FFD9A209A84FBCFF798`, one unit below
+the correctly rounded value that `X80Log10Of2` holds.
 
 ## Performance & Accuracy
 
 ### Accuracy
-This library implements IEEE 754 compliant 80-bit extended precision arithmetic. The transcendental functions (Ln, Atan) use series expansions with sufficient terms to achieve high accuracy:
+Add, Sub, Mul, Div, Rem, Mod, Sqrt, Scale, the conversions, `Pow10`, `Parse`
+and `Constant.Value` are correctly rounded; this is checked against `math/big`
+on hundreds of thousands of random operands.
 
-- **Ln**: Accurate to within 1 ULP (Unit in the Last Place) for most inputs
-- **Atan**: Accurate to within 1 ULP for most inputs
-- **Sqrt**: Bit-exact results for exact squares
+The transcendental functions are evaluated with a 128-bit significand and
+rounded once, in the current rounding mode and precision. Their evaluation
+error is below 2^-110, so results are correctly rounded except in
+astronomically rare cases: measured against 400-bit references on 54,000
+random arguments over the whole domains, no result was off by more than
+0.5 ULP. The trigonometric argument reduction is exact enough for every X80
+value, including arguments like 10^4000.
 
 ### Performance Characteristics
 - Arithmetic operations are optimized for speed while maintaining accuracy
 - Series expansions are tuned for convergence speed vs precision trade-offs
 - Memory layout is optimized for 64-bit architectures
-- No dynamic memory allocation during computation
+- Arithmetic, conversions and transcendental functions do not allocate
+- Trigonometric argument reduction multiplies by a precomputed table of 2/π (generated with `go generate`)
+- `Parse` and `Pow10` fall back to exact `math/big` arithmetic only for inputs within 2^-44 ULP of a rounding boundary, or with more than 38 significant digits
 
 ### Benchmarks
 Run benchmarks with:
@@ -290,9 +210,10 @@ go test -bench=.
 ```
 
 Typical performance on modern hardware:
-- Basic arithmetic: ~10-20 ns per operation
-- Transcendental functions: ~50-200 ns per operation
-- Conversions: ~20-50 ns per operation
+- Basic arithmetic: ~5-35 ns per operation
+- Transcendental functions: ~130-400 ns per operation
+- Conversions: ~3-20 ns per operation
+- `Parse`, `String`: ~200-300 ns
 
 ## Advanced Usage
 
@@ -432,7 +353,6 @@ The implementation is validated against:
 - Update documentation for API changes
 
 ### Areas for Contribution
-- Additional mathematical functions (exp, sin, cos, tan, etc.)
 - Performance optimizations
 - More comprehensive test coverage
 - Documentation improvements
@@ -488,6 +408,4 @@ The package includes benchmarks for performance measurement. Run with `go test -
 
 ### TODOs
 
-- further improve test coverage (currently 48.1%)
 - add more examples
-- implement more mathematical operations (exp, sin, cos, etc.)

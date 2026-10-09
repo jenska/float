@@ -15,9 +15,7 @@ PACKAGE=./...
 COVERAGE_FILE=coverage.out
 COVERAGE_HTML=coverage.html
 
-.PHONY: all build clean test bench coverage deps tidy fmt vet lint help
-
-.PHONY: all build clean test bench coverage deps tidy fmt vet lint help
+.PHONY: all build clean test bench bench-profile coverage deps tidy fmt fix vet lint staticcheck check doc test-coverage dev ci install-tools help
 
 # Default target
 all: fmt vet test
@@ -64,13 +62,13 @@ fmt:
 vet:
 	$(GOVET) ./...
 
-# Run golint (if available)
+# Apply go fix modernizations
+fix:
+	$(GOCMD) fix ./...
+
+# Fail if go fix would change anything
 lint:
-	@if command -v golint >/dev/null 2>&1; then \
-		golint ./...; \
-	else \
-		echo "golint not installed. Install with: go install golang.org/x/lint/golint@latest"; \
-	fi
+	@test -z "$$($(GOCMD) fix -diff ./...)" || (echo "go fix has pending changes; run 'make fix'"; exit 1)
 
 # Run staticcheck (if available)
 staticcheck:
@@ -98,7 +96,6 @@ ci: tidy check test build
 
 # Install development tools
 install-tools:
-	$(GOCMD) install golang.org/x/lint/golint@latest
 	$(GOCMD) install honnef.co/go/tools/cmd/staticcheck@latest
 	$(GOCMD) install golang.org/x/tools/cmd/goimports@latest
 
@@ -115,7 +112,8 @@ help:
 	@echo "  tidy         - Tidy dependencies"
 	@echo "  fmt          - Format code"
 	@echo "  vet          - Run go vet"
-	@echo "  lint         - Run golint (if installed)"
+	@echo "  fix          - Apply go fix modernizations"
+	@echo "  lint         - Fail if go fix has pending changes"
 	@echo "  staticcheck  - Run staticcheck (if installed)"
 	@echo "  check        - Run all code quality checks"
 	@echo "  doc          - Generate documentation"
