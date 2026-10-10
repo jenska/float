@@ -13,7 +13,7 @@ go get github.com/jenska/float@v1.1.0
 
 ### Requirements
 - Go 1.27 or later
-- 
+
 ## Features
 
 - **Full IEEE 754 Compliance**: Correctly rounded basic operations in all four rounding modes and at 32/64/80-bit rounding precision
@@ -25,7 +25,7 @@ go get github.com/jenska/float@v1.1.0
 - **Exception Handling**: IEEE 754 exception flags with customizable handlers
 - **High Performance**: Optimized bit-level operations
 - **Not goroutine-safe**: rounding mode, rounding precision and exception flags are package-level state; don't use the package from several goroutines at once
-- 
+
 ## API Reference
 
 See the [package documentation](https://pkg.go.dev/github.com/jenska/float) for details.
@@ -122,7 +122,7 @@ value, including arguments like 10^4000.
 ### Benchmarks
 Run benchmarks with:
 ```bash
-go test -bench=.
+go test -run '^$' -bench . ./...
 ```
 
 Typical performance on modern hardware:
@@ -131,88 +131,136 @@ Typical performance on modern hardware:
 - Conversions: ~3-20 ns per operation
 - `Parse`, `String`: ~200-300 ns
 
-## Advanced Usage
+## Examples
 
-### Custom Exception Handling
+### Basic Usage
 ```go
 package main
 
 import (
-    "fmt"
-    "github.com/yourusername/float"
+	"fmt"
+
+	"github.com/jenska/float"
 )
 
-func customHandler(exc int) {
-    if exc & float.ExceptionOverflow != 0 {
-        fmt.Println("Overflow detected!")
-    }
-    if exc & float.ExceptionUnderflow != 0 {
-        fmt.Println("Underflow detected!")
-    }
-}
-
 func main() {
-    // Set custom exception handler
-    float.SetExceptionHandler(customHandler)
-    
-    // Operations that may cause exceptions
-    a := float.NewFromFloat64(1e308)
-    b := float.NewFromFloat64(1e308)
-    result := a.Mul(b) // May overflow
-    
-    fmt.Printf("Result: %s\n", result.String())
+	pi := float.X80Pi
+	fmt.Println(pi)                 // 21 significant digits
+	fmt.Println(pi.Format('e', 10)) // fixed number of decimals
+
+	x, err := float.Parse("0.1")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(x.Mul(float.Int64ToFloatX80(3)))
+	fmt.Println(float.X80One.Exp(), pi.Div(float.Int64ToFloatX80(6)).Sin())
 }
 ```
 
-### Working with Raw Bytes
+Output:
+```
+3.14159265358979323851
+3.1415926536e+00
+0.300000000000000000011
+2.71828182845904523543 0.5
+```
+
+### Exception Handling
 ```go
 package main
 
 import (
-    "encoding/binary"
-    "fmt"
-    "github.com/yourusername/float"
+	"fmt"
+
+	"github.com/jenska/float"
 )
 
 func main() {
-    // Create a float
-    x := float.X80Pi
-    
-    // Convert to bytes (big-endian)
-    bytes := make([]byte, 10)
-    binary.BigEndian.PutUint16(bytes[0:2], x.High())
-    binary.BigEndian.PutUint64(bytes[2:10], x.Low())
-    
-    // Convert back
-    y := float.NewFromBytes(bytes, binary.BigEndian)
-    
-    fmt.Printf("Original: %s\n", x.String())
-    fmt.Printf("Roundtrip: %s\n", y.String())
+	float.SetExceptionHandler(func(exc int) {
+		if exc&float.ExceptionOverflow != 0 {
+			fmt.Println("overflow")
+		}
+		if exc&float.ExceptionDivbyzero != 0 {
+			fmt.Println("division by zero")
+		}
+	})
+	defer float.SetExceptionHandler(nil)
+
+	fmt.Println(float.Int64ToFloatX80(20000).Exp()) // e^20000 exceeds ~1.19e4932
+	fmt.Println(float.X80Zero.Ln())
+
+	// Flags accumulate until cleared, also without a handler.
+	float.ClearExceptions()
+	third := float.X80One.Div(float.Int64ToFloatX80(3))
+	fmt.Println(third, float.HasException(float.ExceptionInexact))
 }
 ```
 
-### Precision Comparison
+Output:
+```
+overflow
++Inf
+division by zero
+-Inf
+0.333333333333333333342 true
+```
+
+### Raw Bits and the 68881/68882 Memory Format
 ```go
 package main
 
 import (
-    "fmt"
-    "math"
-    "github.com/yourusername/float"
+	"encoding/binary"
+	"fmt"
+
+	"github.com/jenska/float"
 )
 
 func main() {
-    // Compare precision
-    x64 := 1.0000000000000002
-    x80 := float.NewFromFloat64(x64)
-    
-    fmt.Printf("float64: %.20f\n", x64)
-    fmt.Printf("X80:     %s\n", x80.String())
-    
-    // More precision with X80
-    precise := float.X80One.Div(float.NewFromFloat64(3))
-    fmt.Printf("1/3 with high precision: %s\n", precise.String())
+	x := float.X80Pi
+
+	// Sign/exponent word and 64-bit significand
+	high, low := x.Bits()
+	fmt.Printf("%04X %016X\n", high, low)
+	fmt.Println(float.NewFromBits(high, low) == x)
+
+	// 12-byte 68881/68882 memory format (.X): exponent, padding, significand
+	b := x.Bytes96(binary.BigEndian)
+	fmt.Printf("% X\n", b)
+	fmt.Println(float.NewFromBytes96(b, binary.BigEndian) == x)
 }
+```
+
+Output:
+```
+4000 C90FDAA22168C235
+true
+40 00 00 00 C9 0F DA A2 21 68 C2 35
+true
+```
+
+### Precision Compared to float64
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/jenska/float"
+)
+
+func main() {
+	x64 := 1.0 / 3
+	x80 := float.X80One.Div(float.Int64ToFloatX80(3))
+	fmt.Printf("float64: %.21g\n", x64)
+	fmt.Println("X80:    ", x80)
+}
+```
+
+Output:
+```
+float64: 0.33333333333333331483
+X80:     0.333333333333333333342
 ```
 
 ## Testing & Validation
@@ -220,40 +268,43 @@ func main() {
 ### Running Tests
 ```bash
 # Run all tests
-go test
+go test ./...
 
-# Run with coverage
-go test -cover
+# Skip the slower accuracy sweeps
+go test -short ./...
 
-# Run specific test file
-go test -run TestOperations
+# Run one group of tests, e.g. the transcendental accuracy tests
+go test -run TestTranscendentalAccuracy -v
+
+# Coverage report (coverage.out and coverage.html)
+make coverage
 
 # Run benchmarks
-go test -bench=.
+go test -run '^$' -bench . ./...
 ```
 
 ### Test Coverage
-Current test coverage: ~48%
+Test coverage is about 84% of statements; `make coverage` produces the current
+figure.
 
 Test categories:
-- **Unit Tests**: Basic functionality for all operations
-- **Edge Cases**: NaN, infinity, denormals, overflow/underflow
-- **Conversions**: Round-trip accuracy between types
-- **Comparisons**: All comparison operators
-- **Formatting**: String representation accuracy
+- **Differential tests** (`reference_test.go`, `functions_test.go`): arithmetic, comparisons, conversions, `Parse`, `Pow10` and formatting compared with exact `math/big` results on hundreds of thousands of random operands, in all rounding modes and precisions
+- **Accuracy tests** (`transcendental_test.go`): every transcendental function compared with 400-bit references over its whole domain
+- **Edge cases**: NaN propagation, infinities, signed zeros, subnormals, unnormals, overflow and underflow, and the exception flags each operation raises
+- **Unit tests**: per-operation tables in `operations_test.go`, `conversions_test.go` and `comparisons_test.go`
 
 ### Validation Against Reference
 The implementation is validated against:
-- IEEE 754 specification requirements
-- Known mathematical constants (π, e, √2, etc.)
-- Reference implementations where available
-- Extensive edge case testing
+- Exact `math/big` arithmetic for every correctly rounded operation
+- Independently computed 400-bit references for the transcendental functions
+- Known mathematical constants (π, e, ln 2, √2, ...), recomputed from series in the tests
+- IEEE 754 special cases and exception semantics
 
 ## Contributing
 
 ### Development Setup
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/yourusername/float.git`
+2. Clone your fork: `git clone https://github.com/<your-username>/float.git`
 3. Install dependencies: `go mod download`
 4. Run tests: `go test ./...`
 5. Make your changes
@@ -293,7 +344,7 @@ See [CHANGELOG.md](CHANGELOG.md) for a complete list of changes and version hist
 The library implements IEEE 754 exception handling with the following exception flags:
 
 - `ExceptionInvalid`: Invalid operation (e.g., sqrt of negative number, 0/0)
-- `ExceptionDenormal`: Denormalized number encountered
+- `ExceptionDenormal`: Defined for x87 compatibility; never raised
 - `ExceptionDivbyzero`: Division by zero
 - `ExceptionOverflow`: Result too large to represent
 - `ExceptionUnderflow`: Result too small to represent
@@ -318,10 +369,6 @@ float.ClearExceptions()
 
 Exceptions are raised during operations but don't prevent execution. Operations return appropriate IEEE 754 values (NaN, Inf) for exceptional conditions.
 
-## Benchmarks
-
-The package includes benchmarks for performance measurement. Run with `go test -bench=.`.
-
-### TODOs
+## TODOs
 
 - add more examples
