@@ -1,10 +1,5 @@
 # 80-bit IEEE 754 extended double precision floating-point library for Go
 
-[![CI](https://github.com/jenska/float/actions/workflows/ci.yml/badge.svg)](https://github.com/jenska/float/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/jenska/float)](https://goreportcard.com/report/github.com/jenska/float)
-[![codecov](https://codecov.io/gh/jenska/float/branch/main/graph/badge.svg)](https://codecov.io/gh/jenska/float)
-[![Go Reference](https://pkg.go.dev/badge/github.com/jenska/float.svg)](https://pkg.go.dev/github.com/jenska/float)
-
 The float package is a software implementation of floating-point arithmetics that conforms to
 the 80-bit IEEE 754 extended double precision floating-point format
 
