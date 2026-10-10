@@ -13,41 +13,7 @@ go get github.com/jenska/float@v1.1.0
 
 ### Requirements
 - Go 1.27 or later
-
-## Development
-
-This project includes a Makefile for common development tasks:
-
-```bash
-# Show all available commands
-make help
-
-# Development workflow (format, vet, test)
-make dev
-
-# Run tests with coverage report
-make coverage
-
-# Run benchmarks
-make bench
-
-# Clean build artifacts
-make clean
-```
-
-### Available Make Targets
-
-- `make all` - Run fmt, vet, and test
-- `make build` - Verify the project compiles
-- `make test` - Run all tests
-- `make bench` - Run benchmarks
-- `make coverage` - Generate coverage report
-- `make fmt` - Format code
-- `make vet` - Run go vet
-- `make clean` - Clean artifacts
-- `make dev` - Development workflow
-- `make ci` - CI workflow
-
+- 
 ## Features
 
 - **Full IEEE 754 Compliance**: Correctly rounded basic operations in all four rounding modes and at 32/64/80-bit rounding precision
@@ -59,52 +25,7 @@ make clean
 - **Exception Handling**: IEEE 754 exception flags with customizable handlers
 - **High Performance**: Optimized bit-level operations
 - **Not goroutine-safe**: rounding mode, rounding precision and exception flags are package-level state; don't use the package from several goroutines at once
-
-## Example
-
-```go
-package float_test
-
-import (
-    "fmt"
-    "github.com/jenska/float"
-)
-
-func ExampleX80() {
-    pi := float.X80Pi
-    fmt.Println(pi)
-    fmt.Println(pi.Format('e', 10))
-
-    // The square of a correctly rounded square root recovers 2*pi exactly here.
-    pi2 := pi.Add(pi)
-    sqrtpi2 := pi2.Sqrt()
-    fmt.Println(sqrtpi2.Mul(sqrtpi2).Sub(pi2))
-    // Output:
-    // 3.14159265358979323851
-    // 3.1415926536e+00
-    // 0
-}
-
-func ExampleExceptionHandling() {
-    // Set up exception handling
-    float.SetExceptionHandler(func(exc int) {
-        fmt.Printf("Exception raised: %x\n", exc)
-    })
-
-    // This will raise an exception
-    result := float.X80Zero.Ln()
-    fmt.Printf("Result: %v\n", result)
-
-    // Check what exceptions occurred
-    if float.HasException(float.ExceptionDivbyzero) {
-        fmt.Println("Division by zero occurred")
-    }
-
-    // Clear exceptions
-    float.ClearExceptions()
-}
-```
-
+- 
 ## API Reference
 
 See the [package documentation](https://pkg.go.dev/github.com/jenska/float) for details.
