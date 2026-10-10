@@ -24,7 +24,7 @@ go get github.com/jenska/float@v1.1.0
 - **String Formatting**: `'b'`, `'e'`, `'E'`, `'f'`, `'g'`, `'G'` verbs and a raw hexadecimal dump (`Internal`)
 - **Exception Handling**: IEEE 754 exception flags with customizable handlers
 - **High Performance**: Optimized bit-level operations
-- **Not goroutine-safe**: rounding mode, rounding precision and exception flags are package-level state; don't use the package from several goroutines at once
+- **Goroutine-safe environments**: an `Env` holds its own rounding mode, precision and exception flags, so each goroutine can compute independently; the X80 methods use package-level settings and are not goroutine-safe
 
 ## API Reference
 
@@ -41,6 +41,16 @@ The 68881/68882 column names the FPU operation each function implements.
 | `DefaultNaN` | NaN returned by invalid operations; set to `NewFromBits(0x7FFF, 0xFFFFFFFFFFFFFFFF)` for the 68881/68882 |
 | `Exception`, `GetExceptions`, `HasException`, `ClearExceptions`, ... | Accumulated exception flags `ExceptionInvalid`, `ExceptionDivbyzero`, `ExceptionOverflow`, `ExceptionUnderflow`, `ExceptionInexact` |
 | `SetExceptionHandler` | Callback for every raised exception |
+
+These package-level settings are used by the X80 methods and package functions
+(`a.Add(b)`, `Pow10(n)`, ...) and are not safe for concurrent use. For
+concurrent code, or to emulate several FPUs, use an `Env`: it has the same
+settings as fields, accumulates its own `Exception` flags and calls its own
+`Handler`. Every operation that rounds or raises exceptions is also an `Env`
+method (`e.Add(a, b)`, `e.Sin(a)`, `e.Pow10(n)`, `e.Parse(s)`,
+`e.Constant(ConstPi)`, ...). An `Env` belongs to one goroutine at a time;
+separate `Env`s share no state. The zero `Env` rounds to nearest even at
+80-bit precision.
 
 ### Arithmetic
 
@@ -372,10 +382,3 @@ Exceptions are raised during operations but don't prevent execution. Operations 
 ## TODOs
 
 - add more examples
-- goroutine safety: move the floating-point state into an `Env` type, like SoftFloat's `float_status` or the 68881/68882 FPCR/FPSR
-  - `Env` holds `RoundingMode`, `RoundingPrecision`, `DetectTininess`, `DefaultNaN`, the `Exception` flags and the exception handler
-  - each rounding or exception-raising operation becomes an `Env` method, e.g. `env.Add(a, b)`, `env.Sin(a)`
-  - an `Env` belongs to one goroutine at a time; concurrent code gives each goroutine its own
-  - backward compatible (v1.x): the current package-level variables become a default `Env`, and `a.Add(b)` calls `defaultEnv.Add(a, b)`; this API stays non-goroutine-safe
-  - internally, `Trunc` and `captureExceptions` must stop temporarily changing shared state
-  - add a `-race` test that runs operations with different rounding modes in parallel

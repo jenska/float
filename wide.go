@@ -241,12 +241,12 @@ func (a wide) sqrt() wide {
 // round returns a, an approximation of an irrational value, rounded to X80
 // with the current rounding mode and precision.  It raises the inexact
 // exception and, if the result is out of range, overflow or underflow.
-func (a wide) round() X80 {
+func (a wide) round(e *Env) X80 {
 	if a.hi == 0 {
 		return packFloatX80(a.neg, 0, 0)
 	}
 	zExp := max(min(a.exp+0x3FFF, 0x10000), -0x7000)
-	return roundAndPackFloatX80(RoundingPrecision, a.neg, zExp, a.hi, a.lo|1)
+	return e.roundAndPackFloatX80(e.RoundingPrecision, a.neg, zExp, a.hi, a.lo|1)
 }
 
 // horner returns c[0] + x*(c[1] + x*(c[2] + ...)).

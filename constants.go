@@ -61,34 +61,34 @@ var constantBits = [...]struct {
 // Value returns c correctly rounded to the current RoundingPrecision using the
 // current RoundingMode, and raises the inexact exception. The X80Pi, X80E, ...
 // variables hold the round-to-nearest values at full precision.
-func (c Constant) Value() X80 {
+func (e *Env) Constant(c Constant) X80 {
 	k := constantBits[c]
-	return roundAndPackFloatX80(RoundingPrecision, false, k.exp, k.hi, k.lo|1)
+	return e.roundAndPackFloatX80(e.RoundingPrecision, false, k.exp, k.hi, k.lo|1)
 }
 
 // Pow10 returns 10^n correctly rounded to the current RoundingPrecision using
 // the current RoundingMode. Results that cannot be represented exactly raise
 // the inexact exception, and out-of-range results overflow or underflow like
 // any other operation. 10^n is exact for 0 <= n <= 27.
-func Pow10(n int) X80 {
+func (e *Env) Pow10(n int) X80 {
 	switch {
 	case 0 <= n && n < len(pow10Exact):
-		if RoundingPrecision != 80 {
-			return pow10Exact[n].RoundToPrecision(RoundingPrecision)
+		if e.RoundingPrecision != 80 {
+			return e.RoundToPrecision(pow10Exact[n], e.RoundingPrecision)
 		}
 		return pow10Exact[n]
 	case -len(pow10Exact) < n && n < 0:
-		return X80One.Div(pow10Exact[-n]) // one correctly rounded operation
+		return e.Div(X80One, pow10Exact[-n]) // one correctly rounded operation
 	}
 	n = max(min(n, 5000), -5000) // beyond this the result is Inf or 0 anyway
-	if z, ok := roundWideSafe(false, wPow10(n)); ok {
+	if z, ok := e.roundWideSafe(false, wPow10(n)); ok {
 		return z
 	}
 	p := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(max(n, -n))), nil)
 	if n < 0 {
-		return roundRatio(false, big.NewInt(1), p)
+		return e.roundRatio(false, big.NewInt(1), p)
 	}
-	return roundRatio(false, p, big.NewInt(1))
+	return e.roundRatio(false, p, big.NewInt(1))
 }
 
 // pow10Tables holds 10^(2^i) and 10^-(2^i) for i = 0..12, truncated to 128
@@ -137,13 +137,13 @@ const wideSlack = 1 << 20
 // than wideSlack from zero, from a half-way point and from the next
 // representable value. Results near the subnormal or overflow range are left
 // to the exact path.
-func roundWideSafe(neg bool, p wide) (X80, bool) {
+func (e *Env) roundWideSafe(neg bool, p wide) (X80, bool) {
 	zExp := p.exp + 0x3FFF
 	if p.hi == 0 || zExp <= 64 || zExp >= 0x7FFE {
 		return X80{}, false
 	}
 	s := uint(0) // significand bits discarded from hi
-	switch RoundingPrecision {
+	switch e.RoundingPrecision {
 	case 64:
 		s = 11
 	case 32:
@@ -166,13 +166,13 @@ func roundWideSafe(neg bool, p wide) (X80, bool) {
 	if near(0, 0) || near(1<<s, 0) || near(halfHi, halfLo) {
 		return X80{}, false
 	}
-	return roundAndPackFloatX80(RoundingPrecision, neg, zExp, p.hi, p.lo), true
+	return e.roundAndPackFloatX80(e.RoundingPrecision, neg, zExp, p.hi, p.lo), true
 }
 
 // roundRatio returns the positive rational num/den, negated if zSign is set,
 // correctly rounded to the current RoundingPrecision using the current
 // RoundingMode.
-func roundRatio(zSign bool, num, den *big.Int) X80 {
+func (e *Env) roundRatio(zSign bool, num, den *big.Int) X80 {
 	// scale so that the integer quotient has 128 or 129 bits
 	s := 128 - (num.BitLen() - den.BitLen())
 	n, d := new(big.Int).Set(num), new(big.Int).Set(den)
@@ -195,7 +195,7 @@ func roundRatio(zSign bool, num, den *big.Int) X80 {
 	}
 	zExp := 127 - s + 0x3FFF
 	zExp = max(min(zExp, 0x10000), -0x7000)
-	return roundAndPackFloatX80(RoundingPrecision, zSign, zExp, hi, lo)
+	return e.roundAndPackFloatX80(e.RoundingPrecision, zSign, zExp, hi, lo)
 }
 
 // Parse converts the string s to the nearest X80 value, rounded according to
@@ -207,7 +207,7 @@ func roundRatio(zSign bool, num, den *big.Int) X80 {
 // point and exponent ("-12.5e-3"), a hexadecimal number with an optional
 // binary exponent ("0x1.8p3"), or "Inf", "Infinity" or "NaN" in any case.
 // Parse returns a *strconv.NumError with ErrSyntax if s is malformed.
-func Parse(s string) (X80, error) {
+func (e *Env) Parse(s string) (X80, error) {
 	str := s
 	neg := false
 	if str != "" && (str[0] == '+' || str[0] == '-') {
@@ -302,22 +302,22 @@ exponent:
 		// mant * 2^e is exact: round it directly
 		w := normWide(neg, 127, mHi, mLo)
 		zExp := max(min(w.exp+exp-4*fracDigits+0x3FFF, 0x10000), -0x7000)
-		return roundAndPackFloatX80(RoundingPrecision, neg, zExp, w.hi, w.lo), nil
+		return e.roundAndPackFloatX80(e.RoundingPrecision, neg, zExp, w.hi, w.lo), nil
 	}
 	if mant == nil {
-		if e := exp - fracDigits; -8192 < e && e < 8192 {
+		if pe := exp - fracDigits; -8192 < pe && pe < 8192 {
 			// fast paths: one exact operation, or a wide product
-			if mHi == 0 && mLo < 1<<63 && -len(pow10Exact) < e && e < len(pow10Exact) {
+			if mHi == 0 && mLo < 1<<63 && -len(pow10Exact) < pe && pe < len(pow10Exact) {
 				m := Int64ToFloatX80(int64(mLo))
 				if neg {
 					m = m.Neg()
 				}
-				if e >= 0 {
-					return m.Mul(pow10Exact[e]), nil
+				if pe >= 0 {
+					return e.Mul(m, pow10Exact[pe]), nil
 				}
-				return m.Div(pow10Exact[-e]), nil
+				return e.Div(m, pow10Exact[-pe]), nil
 			}
-			if z, ok := roundWideSafe(neg, normWide(false, 127, mHi, mLo).mul(wPow10(e))); ok {
+			if z, ok := e.roundWideSafe(neg, normWide(false, 127, mHi, mLo).mul(wPow10(pe))); ok {
 				return z, nil
 			}
 		}
@@ -325,25 +325,25 @@ exponent:
 	}
 	if base == 16 {
 		// mant * 16^-fracDigits * 2^exp; clamp far outside the X80 range
-		e := max(min(exp-4*fracDigits, 40000), -40000)
-		if e >= 0 {
-			return roundRatio(neg, mant.Lsh(mant, uint(e)), one), nil
+		pe := max(min(exp-4*fracDigits, 40000), -40000)
+		if pe >= 0 {
+			return e.roundRatio(neg, mant.Lsh(mant, uint(pe)), one), nil
 		}
-		return roundRatio(neg, mant, new(big.Int).Lsh(one, uint(-e))), nil
+		return e.roundRatio(neg, mant, new(big.Int).Lsh(one, uint(-pe))), nil
 	}
-	e := exp - fracDigits
-	// mant * 10^e; values beyond 10^±5000 overflow or underflow anyway
-	switch magnitude := e + digits; {
+	pe := exp - fracDigits
+	// mant * 10^pe; values beyond 10^±5000 overflow or underflow anyway
+	switch magnitude := pe + digits; {
 	case magnitude > 5000:
-		e, mant = 5000, big.NewInt(1)
+		pe, mant = 5000, big.NewInt(1)
 	case magnitude < -5000:
-		e, mant = -5000, big.NewInt(1)
+		pe, mant = -5000, big.NewInt(1)
 	}
-	p := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(max(e, -e))), nil)
-	if e >= 0 {
-		return roundRatio(neg, mant.Mul(mant, p), one), nil
+	p := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(max(pe, -pe))), nil)
+	if pe >= 0 {
+		return e.roundRatio(neg, mant.Mul(mant, p), one), nil
 	}
-	return roundRatio(neg, mant, p), nil
+	return e.roundRatio(neg, mant, p), nil
 }
 
 func uint128ToBig(hi, lo uint64) *big.Int {

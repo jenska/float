@@ -26,6 +26,15 @@
 //	    log.Printf("FP exception: %x", exc)
 //	})
 //
+// The X80 methods and package functions use the package-level settings
+// RoundingMode, RoundingPrecision, DetectTininess and DefaultNaN and the
+// package-level exception flags, and are not safe for concurrent use.  An Env
+// holds these settings and flags for one goroutine:
+//
+//	e := &float.Env{RoundingMode: float.RoundUp}
+//	third := e.Div(float.X80One, float.Int64ToFloatX80(3))
+//	inexact := e.Exception&float.ExceptionInexact != 0
+//
 // Unnormal (nonzero exponent, integer bit clear) and pseudo-denormal (zero
 // exponent, integer bit set) encodings are accepted as operands and
 // normalized, as on the Motorola 68881/68882. For infinities and NaNs the
@@ -166,23 +175,12 @@ func Raise(x int) {
 	}
 }
 
-// captureExceptions runs f with exception reporting suspended and returns the
-// exception flags f raised. The caller's flags and handler are restored.
-func captureExceptions(f func()) int {
-	savedExc, savedHandler := Exception, exceptionHandler
-	Exception, exceptionHandler = 0, nil
-	f()
-	raised := Exception
-	Exception, exceptionHandler = savedExc, savedHandler
-	return raised
-}
-
 // NewFromFloat64 returns the result of converting the double-precision floating-point value
 // `a' to the extended double-precision floating-point format.  The conversion
 // is performed according to the IEC/IEEE Standard for Binary Floating-Point
 // Arithmetic.
-func NewFromFloat64(a float64) X80 {
-	return Float64ToFloatX80(a)
+func (e *Env) NewFromFloat64(a float64) X80 {
+	return e.Float64ToFloatX80(a)
 }
 
 // Bytes returns the 10-byte memory representation of an extended double
@@ -365,7 +363,7 @@ func newFromHexString(s string) X80 {
 // Takes two extended double-precision floating-point values `a' and `b', one
 // of which is a NaN, and returns the appropriate NaN result.  If either `a' or
 // `b' is a signaling NaN, the invalid exception is raised.
-func propagateFloatX80NaN(a, b X80) X80 {
+func (e *Env) propagateFloatX80NaN(a, b X80) X80 {
 	aIsNaN := a.IsNaN()
 	aIsSignalingNaN := a.IsSignalingNaN()
 	bIsNaN := b.IsNaN()
@@ -373,7 +371,7 @@ func propagateFloatX80NaN(a, b X80) X80 {
 	a.low |= 0xC000000000000000
 	b.low |= 0xC000000000000000
 	if aIsSignalingNaN || bIsSignalingNaN {
-		Raise(ExceptionInvalid)
+		e.Raise(ExceptionInvalid)
 	}
 	if aIsNaN {
 		if aIsSignalingNaN && bIsNaN {
@@ -425,92 +423,15 @@ func (a X80) IsInf() bool {
 // returned is a subnormal number, and it must not require rounding.  The
 // handling of underflow and overflow follows the IEC/IEEE Standard for Binary
 // Floating-Point Arithmetic.
-func roundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zSig1 uint64) X80 {
-	roundingMode := RoundingMode
+func (e *Env) roundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zSig1 uint64) X80 {
+	roundingMode := e.RoundingMode
 	roundNearestEven := roundingMode == RoundNearestEven
-
-	overflow := func(roundMask uint64) X80 {
-		Raise(ExceptionOverflow | ExceptionInexact)
-		if roundingMode == RoundToZero ||
-			(zSign && roundingMode == RoundUp) ||
-			(!zSign && roundingMode == RoundDown) {
-			return packFloatX80(zSign, 0x7FFE, ^roundMask)
-		}
-		return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)
-	}
-
-	precision64 := func(roundIncrement, roundMask uint64) X80 {
-		if zSig1 != 0 {
-			zSig0 |= 1
-		}
-		if !roundNearestEven {
-			if roundingMode == RoundToZero {
-				roundIncrement = 0
-			} else {
-				roundIncrement = roundMask
-				if zSign {
-					if roundingMode == RoundUp {
-						roundIncrement = 0
-					}
-				} else {
-					if roundingMode == RoundDown {
-						roundIncrement = 0
-					}
-				}
-			}
-		}
-		roundBits := zSig0 & roundMask
-		if 0x7FFD <= uint32(zExp-1) {
-			if 0x7FFE < zExp || ((zExp == 0x7FFE) && (zSig0+uint64(roundIncrement) < zSig0)) {
-				return overflow(roundMask)
-			}
-			if zExp <= 0 {
-				isTiny := DetectTininess == TininessBeforeRounding || zExp < 0 || zSig0 <= zSig0+roundIncrement
-				zSig0 = shift64RightJamming(zSig0, 1-int16(zExp))
-				zExp = 0
-				roundBits = zSig0 & roundMask
-				if isTiny && roundBits != 0 {
-					Raise(ExceptionUnderflow)
-				}
-				if roundBits != 0 {
-					Raise(ExceptionInexact)
-				}
-				zSig0 += roundIncrement
-				if int64(zSig0) < 0 {
-					zExp = 1
-				}
-				roundIncrement = roundMask + 1
-				if roundNearestEven && (roundBits<<1 == roundIncrement) {
-					roundMask |= roundIncrement
-				}
-				zSig0 &= ^roundMask
-				return packFloatX80(zSign, zExp, zSig0)
-			}
-		}
-		if roundBits != 0 {
-			Raise(ExceptionInexact)
-		}
-		zSig0 += roundIncrement
-		if zSig0 < uint64(roundIncrement) {
-			zExp++
-			zSig0 = 0x8000000000000000
-		}
-		roundIncrement = roundMask + 1
-		if roundNearestEven && (roundBits<<1 == roundIncrement) {
-			roundMask |= roundIncrement
-		}
-		zSig0 &= ^uint64(roundMask)
-		if zSig0 == 0 {
-			zExp = 0
-		}
-		return packFloatX80(zSign, zExp, zSig0)
-	}
 
 	switch roundingPrecision {
 	case 64:
-		return precision64(0x0000000000000400, 0x00000000000007FF)
+		return e.roundAndPackFloatX80Reduced(zSign, zExp, zSig0, zSig1, 0x0000000000000400, 0x00000000000007FF)
 	case 32:
-		return precision64(0x0000008000000000, 0x000000FFFFFFFFFF)
+		return e.roundAndPackFloatX80Reduced(zSign, zExp, zSig0, zSig1, 0x0000008000000000, 0x000000FFFFFFFFFF)
 	default: // 80
 		increment := int64(zSig1) < 0
 		if !roundNearestEven {
@@ -527,20 +448,20 @@ func roundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zS
 		if 0x7FFD <= uint32(zExp-1) {
 			if (0x7FFE < zExp) ||
 				(zExp == 0x7FFE && zSig0 == 0xFFFFFFFFFFFFFFFF && increment) {
-				return overflow(0)
+				return e.overflowFloatX80(zSign, 0)
 			}
 			if zExp <= 0 {
-				isTiny := DetectTininess == TininessBeforeRounding ||
+				isTiny := e.DetectTininess == TininessBeforeRounding ||
 					zExp < 0 ||
 					!increment ||
 					zSig0 < 0xFFFFFFFFFFFFFFFF
 				zSig0, zSig1 = shift64ExtraRightJamming(zSig0, zSig1, 1-int16(zExp))
 				zExp = 0
 				if isTiny && zSig1 != 0 {
-					Raise(ExceptionUnderflow)
+					e.Raise(ExceptionUnderflow)
 				}
 				if zSig1 != 0 {
-					Raise(ExceptionInexact)
+					e.Raise(ExceptionInexact)
 				}
 				if roundNearestEven {
 					increment = int64(zSig1) < 0
@@ -564,7 +485,7 @@ func roundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zS
 			}
 		}
 		if zSig1 != 0 {
-			Raise(ExceptionInexact)
+			e.Raise(ExceptionInexact)
 		}
 
 		if increment {
@@ -586,6 +507,93 @@ func roundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zS
 	}
 }
 
+// overflowFloatX80 raises the overflow and inexact exceptions and returns
+// the overflowed result with sign `zSign': an infinity, or the largest finite
+// value with the significand bits `^roundMask' if the rounding mode rounds
+// toward zero.
+func (e *Env) overflowFloatX80(zSign bool, roundMask uint64) X80 {
+	e.Raise(ExceptionOverflow | ExceptionInexact)
+	roundingMode := e.RoundingMode
+	if roundingMode == RoundToZero ||
+		(zSign && roundingMode == RoundUp) ||
+		(!zSign && roundingMode == RoundDown) {
+		return packFloatX80(zSign, 0x7FFE, ^roundMask)
+	}
+	return packFloatX80(zSign, 0x7FFF, 0x8000000000000000)
+}
+
+// roundAndPackFloatX80Reduced is roundAndPackFloatX80 for a rounding
+// precision of 32 or 64 bits, whose significand bits below the precision are
+// `roundMask' with half an ulp of `roundIncrement'.
+func (e *Env) roundAndPackFloatX80Reduced(zSign bool, zExp int, zSig0, zSig1, roundIncrement, roundMask uint64) X80 {
+	roundingMode := e.RoundingMode
+	roundNearestEven := roundingMode == RoundNearestEven
+	if zSig1 != 0 {
+		zSig0 |= 1
+	}
+	if !roundNearestEven {
+		if roundingMode == RoundToZero {
+			roundIncrement = 0
+		} else {
+			roundIncrement = roundMask
+			if zSign {
+				if roundingMode == RoundUp {
+					roundIncrement = 0
+				}
+			} else {
+				if roundingMode == RoundDown {
+					roundIncrement = 0
+				}
+			}
+		}
+	}
+	roundBits := zSig0 & roundMask
+	if 0x7FFD <= uint32(zExp-1) {
+		if 0x7FFE < zExp || ((zExp == 0x7FFE) && (zSig0+uint64(roundIncrement) < zSig0)) {
+			return e.overflowFloatX80(zSign, roundMask)
+		}
+		if zExp <= 0 {
+			isTiny := e.DetectTininess == TininessBeforeRounding || zExp < 0 || zSig0 <= zSig0+roundIncrement
+			zSig0 = shift64RightJamming(zSig0, 1-int16(zExp))
+			zExp = 0
+			roundBits = zSig0 & roundMask
+			if isTiny && roundBits != 0 {
+				e.Raise(ExceptionUnderflow)
+			}
+			if roundBits != 0 {
+				e.Raise(ExceptionInexact)
+			}
+			zSig0 += roundIncrement
+			if int64(zSig0) < 0 {
+				zExp = 1
+			}
+			roundIncrement = roundMask + 1
+			if roundNearestEven && (roundBits<<1 == roundIncrement) {
+				roundMask |= roundIncrement
+			}
+			zSig0 &= ^roundMask
+			return packFloatX80(zSign, zExp, zSig0)
+		}
+	}
+	if roundBits != 0 {
+		e.Raise(ExceptionInexact)
+	}
+	zSig0 += roundIncrement
+	if zSig0 < uint64(roundIncrement) {
+		zExp++
+		zSig0 = 0x8000000000000000
+	}
+	roundIncrement = roundMask + 1
+	if roundNearestEven && (roundBits<<1 == roundIncrement) {
+		roundMask |= roundIncrement
+	}
+	zSig0 &= ^uint64(roundMask)
+	if zSig0 == 0 {
+		zExp = 0
+	}
+	return packFloatX80(zSign, zExp, zSig0)
+}
+
 // Packs the sign `zSign', exponent `zExp', and significand `zSig' into an
 // extended double-precision floating-point value, returning the result.
 func packFloatX80(zSign bool, zExp int, zSig uint64) X80 {
@@ -605,7 +613,7 @@ func packFloatX80(zSign bool, zExp int, zSig uint64) X80 {
 // corresponding to the abstract input.  This routine is just like
 // `roundAndPackFloatx80' except that the input significand does not have to be
 // normalized.
-func normalizeRoundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zSig1 uint64) X80 {
+func (e *Env) normalizeRoundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, zSig0, zSig1 uint64) X80 {
 	if zSig0 == 0 {
 		zSig0 = zSig1
 		zSig1 = 0
@@ -614,7 +622,7 @@ func normalizeRoundAndPackFloatX80(roundingPrecision int, zSign bool, zExp int, 
 	shiftCount := bits.LeadingZeros64(zSig0)
 	zSig0, zSig1 = shortShift128Left(zSig0, zSig1, int16(shiftCount))
 	zExp -= shiftCount
-	return roundAndPackFloatX80(roundingPrecision, zSign, zExp, zSig0, zSig1)
+	return e.roundAndPackFloatX80(roundingPrecision, zSign, zExp, zSig0, zSig1)
 }
 
 // Normalizes the subnormal extended double-precision floating-point value
@@ -634,8 +642,8 @@ func normalizeFloatX80Subnormal(aSig uint64) (zExp int, zSig uint64) {
 // input cannot be represented exactly as an integer.  However, if the fixed-
 // point input is too large, the invalid exception is raised and the largest
 // positive or negative integer is returned.
-func roundAndPackInt32(zSign bool, absZ uint64) int32 {
-	roundingMode := RoundingMode
+func (e *Env) roundAndPackInt32(zSign bool, absZ uint64) int32 {
+	roundingMode := e.RoundingMode
 	roundNearestEven := roundingMode == RoundNearestEven
 	roundIncrement := uint64(0x40)
 
@@ -665,14 +673,14 @@ func roundAndPackInt32(zSign bool, absZ uint64) int32 {
 		z = -z
 	}
 	if (absZ>>32) != 0 || (z != 0 && (z < 0) != zSign) {
-		Raise(ExceptionInvalid)
+		e.Raise(ExceptionInvalid)
 		if zSign {
 			return math.MinInt32
 		}
 		return math.MaxInt32
 	}
 	if roundBits != 0 {
-		Raise(ExceptionInexact)
+		e.Raise(ExceptionInexact)
 	}
 	return z
 }
@@ -686,13 +694,13 @@ func roundAndPackInt32(zSign bool, absZ uint64) int32 {
 // an integer.  However, if the fixed-point input is too large, the invalid
 // exception is raised and the largest positive or negative integer is
 // returned.
-func roundAndPackInt64(zSign bool, absZ0, absZ1 uint64) int64 {
-	roundingMode := RoundingMode
+func (e *Env) roundAndPackInt64(zSign bool, absZ0, absZ1 uint64) int64 {
+	roundingMode := e.RoundingMode
 	roundNearestEven := roundingMode == RoundNearestEven
 	increment := int64(absZ1) < 0
 
 	overflow := func() int64 {
-		Raise(ExceptionInvalid)
+		e.Raise(ExceptionInvalid)
 		if zSign {
 			return math.MinInt64
 		}
@@ -727,7 +735,7 @@ func roundAndPackInt64(zSign bool, absZ0, absZ1 uint64) int64 {
 		return overflow()
 	}
 	if absZ1 != 0 {
-		Raise(ExceptionInexact)
+		e.Raise(ExceptionInexact)
 	}
 	return z
 }
@@ -765,8 +773,8 @@ func packFloat64(zSign bool, zExp int16, zSig uint64) float64 {
 // normalized, `zExp' must be 1 less than the “true” floating-point exponent.
 // The handling of underflow and overflow follows the IEC/IEEE Standard for
 // Binary Floating-Point Arithmetic.
-func roundAndPackFloat64(zSign bool, zExp int16, zSig uint64) float64 {
-	roundingMode := RoundingMode
+func (e *Env) roundAndPackFloat64(zSign bool, zExp int16, zSig uint64) float64 {
+	roundingMode := e.RoundingMode
 	roundNearestEven := roundingMode == RoundNearestEven
 	roundIncrement := int64(0x200)
 	if !roundNearestEven {
@@ -788,7 +796,7 @@ func roundAndPackFloat64(zSign bool, zExp int16, zSig uint64) float64 {
 	roundBits := zSig & 0x3FF
 	if 0x7FD <= uint16(zExp) {
 		if 0x7FD < zExp || (zExp == 0x7FD && int64(zSig)+roundIncrement < 0) {
-			Raise(ExceptionOverflow | ExceptionInexact)
+			e.Raise(ExceptionOverflow | ExceptionInexact)
 			bits := math.Float64bits(packFloat64(zSign, 0x7FF, 0))
 			if roundIncrement == 0 {
 				bits-- // largest finite value
@@ -796,19 +804,19 @@ func roundAndPackFloat64(zSign bool, zExp int16, zSig uint64) float64 {
 			return math.Float64frombits(bits)
 		}
 		if zExp < 0 {
-			isTiny := DetectTininess == TininessBeforeRounding ||
+			isTiny := e.DetectTininess == TininessBeforeRounding ||
 				zExp < -1 ||
 				uint64(int64(zSig)+roundIncrement) < 0x8000000000000000
 			zSig = shift64RightJamming(zSig, -zExp)
 			zExp = 0
 			roundBits = zSig & 0x3FF
 			if isTiny && roundBits != 0 {
-				Raise(ExceptionUnderflow)
+				e.Raise(ExceptionUnderflow)
 			}
 		}
 	}
 	if roundBits != 0 {
-		Raise(ExceptionInexact)
+		e.Raise(ExceptionInexact)
 	}
 	zSig = uint64(int64(zSig)+roundIncrement) >> 10
 	if (roundBits^0x200) == 0 && roundNearestEven {
@@ -833,8 +841,8 @@ func packFloat32(zSign bool, zExp int16, zSig uint32) float32 {
 // precision counterpart of roundAndPackFloat64: the input significand `zSig'
 // has its binary point between bits 30 and 29, which is 7 bits to the left of
 // the usual location.
-func roundAndPackFloat32(zSign bool, zExp int16, zSig uint32) float32 {
-	roundingMode := RoundingMode
+func (e *Env) roundAndPackFloat32(zSign bool, zExp int16, zSig uint32) float32 {
+	roundingMode := e.RoundingMode
 	roundNearestEven := roundingMode == RoundNearestEven
 	roundIncrement := int32(0x40)
 	if !roundNearestEven {
@@ -856,7 +864,7 @@ func roundAndPackFloat32(zSign bool, zExp int16, zSig uint32) float32 {
 	roundBits := zSig & 0x7F
 	if 0xFD <= uint16(zExp) {
 		if 0xFD < zExp || (zExp == 0xFD && int32(zSig)+roundIncrement < 0) {
-			Raise(ExceptionOverflow | ExceptionInexact)
+			e.Raise(ExceptionOverflow | ExceptionInexact)
 			bits := math.Float32bits(packFloat32(zSign, 0xFF, 0))
 			if roundIncrement == 0 {
 				bits-- // largest finite value
@@ -864,19 +872,19 @@ func roundAndPackFloat32(zSign bool, zExp int16, zSig uint32) float32 {
 			return math.Float32frombits(bits)
 		}
 		if zExp < 0 {
-			isTiny := DetectTininess == TininessBeforeRounding ||
+			isTiny := e.DetectTininess == TininessBeforeRounding ||
 				zExp < -1 ||
 				uint32(int32(zSig)+roundIncrement) < 0x80000000
 			zSig = uint32(shift64RightJamming(uint64(zSig), -zExp))
 			zExp = 0
 			roundBits = zSig & 0x7F
 			if isTiny && roundBits != 0 {
-				Raise(ExceptionUnderflow)
+				e.Raise(ExceptionUnderflow)
 			}
 		}
 	}
 	if roundBits != 0 {
-		Raise(ExceptionInexact)
+		e.Raise(ExceptionInexact)
 	}
 	zSig = uint32(int32(zSig)+roundIncrement) >> 7
 	if (roundBits^0x40) == 0 && roundNearestEven {

@@ -106,23 +106,25 @@ func init() {
 
 // approx returns z, an approximation of the function value, rounded to the
 // current RoundingPrecision, and raises the inexact exception once.
-func approx(z X80) X80 {
+func (e *Env) approx(z X80) X80 {
 	raised := 0
-	if RoundingPrecision != 80 {
-		raised = captureExceptions(func() { z = z.RoundToPrecision(RoundingPrecision) })
+	if e.RoundingPrecision != 80 {
+		q := e.quiet()
+		z = q.RoundToPrecision(z, e.RoundingPrecision)
+		raised = q.Exception
 	}
-	Raise(raised | ExceptionInexact)
+	e.Raise(raised | ExceptionInexact)
 	return z
 }
 
 // approxTiny returns a as the value of a function f with f(x) ~ x for tiny
 // x, raising the inexact exception, and underflow if a is subnormal.
-func approxTiny(a X80) X80 {
+func (e *Env) approxTiny(a X80) X80 {
 	if a.exp() == 0 {
-		Raise(ExceptionUnderflow | ExceptionInexact)
+		e.Raise(ExceptionUnderflow | ExceptionInexact)
 		return a
 	}
-	return approx(a)
+	return e.approx(a)
 }
 
 // isInteger reports whether the finite canonical value a is an integer.
@@ -172,17 +174,17 @@ func lnW(x wide) wide {
 }
 
 // logSpecial handles the operands of a logarithm that need no approximation.
-func logSpecial(a X80) (z X80, done bool) {
+func (e *Env) logSpecial(a X80) (z X80, done bool) {
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a), true
+		return e.propagateFloatX80NaN(a, a), true
 	case aExp == 0 && aSig == 0:
-		Raise(ExceptionDivbyzero)
+		e.Raise(ExceptionDivbyzero)
 		return X80InfNeg, true
 	case aSign:
-		Raise(ExceptionInvalid)
-		return DefaultNaN, true
+		e.Raise(ExceptionInvalid)
+		return e.defaultNaN(), true
 	case aExp == 0x7FFF:
 		return a, true
 	case aExp == 0x3FFF && aSig == 1<<63:
@@ -194,19 +196,19 @@ func logSpecial(a X80) (z X80, done bool) {
 // Ln returns the natural logarithm of `a'.  Ln(+Inf) = +Inf, Ln(±0) = -Inf
 // with the divide-by-zero exception, and Ln of a negative value is NaN with
 // the invalid exception.  This is the 68881/68882 FLOGN operation.
-func (a X80) Ln() X80 {
+func (e *Env) Ln(a X80) X80 {
 	a = a.canonical()
-	if z, done := logSpecial(a); done {
+	if z, done := e.logSpecial(a); done {
 		return z
 	}
-	return lnW(wideFromX80(a)).round()
+	return lnW(wideFromX80(a)).round(e)
 }
 
 // Log2 returns the binary logarithm of `a', with the special cases of Ln.
 // Log2(2^k) = k exactly.  This is the 68881/68882 FLOG2 operation.
-func (a X80) Log2() X80 {
+func (e *Env) Log2(a X80) X80 {
 	a = a.canonical()
-	if z, done := logSpecial(a); done {
+	if z, done := e.logSpecial(a); done {
 		return z
 	}
 	x := wideFromX80(a)
@@ -214,15 +216,15 @@ func (a X80) Log2() X80 {
 		return intX80(x.exp)
 	}
 	k, lnM := lnParts(x)
-	return wideFromInt(k).add(lnM.mul(wLog2E)).round()
+	return wideFromInt(k).add(lnM.mul(wLog2E)).round(e)
 }
 
 // Log10 returns the decimal logarithm of `a', with the special cases of Ln.
 // Log10(10^k) = k exactly for 0 <= k <= 27, the powers of ten that are exact
 // X80 values.  This is the 68881/68882 FLOG10 operation.
-func (a X80) Log10() X80 {
+func (e *Env) Log10(a X80) X80 {
 	a = a.canonical()
-	if z, done := logSpecial(a); done {
+	if z, done := e.logSpecial(a); done {
 		return z
 	}
 	k, lnM := lnParts(wideFromX80(a))
@@ -230,32 +232,32 @@ func (a X80) Log10() X80 {
 	if n := int(math.Round(z.float64())); 0 <= n && n < len(pow10Exact) && a == pow10Exact[n] {
 		return intX80(n)
 	}
-	return z.round()
+	return z.round(e)
 }
 
 // Log1p returns ln(1+a), accurate also for `a' near zero.  Log1p(-1) = -Inf
 // with the divide-by-zero exception, and Log1p(a) for a < -1 is NaN with the
 // invalid exception.  This is the 68881/68882 FLOGNP1 operation.
-func (a X80) Log1p() X80 {
+func (e *Env) Log1p(a X80) X80 {
 	a = a.canonical()
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a)
+		return e.propagateFloatX80NaN(a, a)
 	case aSign && isAbsOne(a):
-		Raise(ExceptionDivbyzero)
+		e.Raise(ExceptionDivbyzero)
 		return X80InfNeg
 	case aSign && absGtOne(a):
-		Raise(ExceptionInvalid)
-		return DefaultNaN
+		e.Raise(ExceptionInvalid)
+		return e.defaultNaN()
 	case aExp == 0x7FFF || aSig == 0:
 		return a
 	case aExp < 0x3FFF-64: // ln(1+x) = x - x^2/2 + ... rounds to x
-		return approxTiny(a)
+		return e.approxTiny(a)
 	}
 	// 1+x is exact in the wide format for |x| >= 2^-64, and ln(m) for m near
 	// 1 is computed without cancellation
-	return lnW(wOne.add(wideFromX80(a))).round()
+	return lnW(wOne.add(wideFromX80(a))).round(e)
 }
 
 // ---- exponentials ----
@@ -290,11 +292,11 @@ func expm1W(x wide) wide {
 // expSpecial handles the operands of an exponential that need no
 // approximation; limitExp is the biased exponent from which |a| certainly
 // overflows or underflows.
-func expSpecial(a X80, limitExp int) (z X80, done bool) {
+func (e *Env) expSpecial(a X80, limitExp int) (z X80, done bool) {
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a), true
+		return e.propagateFloatX80NaN(a, a), true
 	case aExp == 0x7FFF && aSign:
 		return X80Zero, true
 	case aExp == 0x7FFF:
@@ -302,9 +304,9 @@ func expSpecial(a X80, limitExp int) (z X80, done bool) {
 	case aSig == 0:
 		return X80One, true
 	case aExp >= limitExp && aSign:
-		return wOne.scale(-0x10000).round(), true
+		return wOne.scale(-0x10000).round(e), true
 	case aExp >= limitExp:
-		return wOne.scale(0x10000).round(), true
+		return wOne.scale(0x10000).round(e), true
 	}
 	return X80{}, false
 }
@@ -312,77 +314,77 @@ func expSpecial(a X80, limitExp int) (z X80, done bool) {
 // Exp returns e^a.  Exp(+Inf) = +Inf, Exp(-Inf) = +0 and Exp(±0) = 1;
 // results out of range overflow or underflow.  This is the 68881/68882 FETOX
 // operation.
-func (a X80) Exp() X80 {
+func (e *Env) Exp(a X80) X80 {
 	a = a.canonical()
-	if z, done := expSpecial(a, 0x3FFF+14); done { // |a| >= 16384
+	if z, done := e.expSpecial(a, 0x3FFF+14); done { // |a| >= 16384
 		return z
 	}
-	return expW(wideFromX80(a)).round()
+	return expW(wideFromX80(a)).round(e)
 }
 
 // Exp2 returns 2^a, with the special cases of Exp.  Exp2(n) is exact for
 // integers n in range.  This is the 68881/68882 FTWOTOX operation.
-func (a X80) Exp2() X80 {
+func (e *Env) Exp2(a X80) X80 {
 	a = a.canonical()
-	if z, done := expSpecial(a, 0x3FFF+15); done { // |a| >= 32768
+	if z, done := e.expSpecial(a, 0x3FFF+15); done { // |a| >= 32768
 		return z
 	}
 	if isInteger(a) {
-		return X80One.Scale(int(a.ToInt64()))
+		return e.Scale(X80One, int(e.ToInt64(a)))
 	}
-	return expW(wideFromX80(a).mul(wLn2)).round()
+	return expW(wideFromX80(a).mul(wLn2)).round(e)
 }
 
 // Exp10 returns 10^a, with the special cases of Exp.  Exp10(n) equals
 // Pow10(n) for integers n and is exact for 0 <= n <= 27.  This is the
 // 68881/68882 FTENTOX operation.
-func (a X80) Exp10() X80 {
+func (e *Env) Exp10(a X80) X80 {
 	a = a.canonical()
-	if z, done := expSpecial(a, 0x3FFF+13); done { // |a| >= 8192
+	if z, done := e.expSpecial(a, 0x3FFF+13); done { // |a| >= 8192
 		return z
 	}
 	if isInteger(a) {
-		return Pow10(int(a.ToInt64()))
+		return e.Pow10(int(e.ToInt64(a)))
 	}
-	return expW(wideFromX80(a).mul(wLn10)).round()
+	return expW(wideFromX80(a).mul(wLn10)).round(e)
 }
 
 // Expm1 returns e^a - 1, accurate also for `a' near zero.  Expm1(+Inf) = +Inf
 // and Expm1(-Inf) = -1.  This is the 68881/68882 FETOXM1 operation.
-func (a X80) Expm1() X80 {
+func (e *Env) Expm1(a X80) X80 {
 	a = a.canonical()
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a)
+		return e.propagateFloatX80NaN(a, a)
 	case aExp == 0x7FFF && aSign:
 		return X80MinusOne
 	case aExp == 0x7FFF || aSig == 0:
 		return a
 	case aExp < 0x3FFF-64: // e^x - 1 = x + x^2/2 + ... rounds to x
-		return approxTiny(a)
+		return e.approxTiny(a)
 	case aExp >= 0x3FFF+6 && !aSign: // x >= 64: e^x - 1 rounds to e^x
-		return a.Exp()
+		return e.Exp(a)
 	case aExp >= 0x3FFF+6: // x <= -64: e^x - 1 rounds to -1
-		return approx(X80MinusOne)
+		return e.approx(X80MinusOne)
 	}
-	return expm1W(wideFromX80(a)).round()
+	return expm1W(wideFromX80(a)).round(e)
 }
 
 // ---- hyperbolic functions ----
 
 // Sinh returns the hyperbolic sine of `a'.  Sinh(±0) = ±0 and
 // Sinh(±Inf) = ±Inf.  This is the 68881/68882 FSINH operation.
-func (a X80) Sinh() X80 {
+func (e *Env) Sinh(a X80) X80 {
 	a = a.canonical()
 	aSig, aExp := a.frac(), a.exp()
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a)
+		return e.propagateFloatX80NaN(a, a)
 	case aExp == 0x7FFF || aSig == 0:
 		return a
 	case aExp < 0x3FFF-32: // sinh(x) = x + x^3/6 + ... rounds to x
-		return approxTiny(a)
+		return e.approxTiny(a)
 	}
 	x := wideFromX80(a)
 	var z wide
@@ -396,37 +398,37 @@ func (a X80) Sinh() X80 {
 		z = t.add(t.div(t.add(wOne))).scale(-1)
 	}
 	z.neg = x.neg
-	return z.round()
+	return z.round(e)
 }
 
 // Cosh returns the hyperbolic cosine of `a'.  Cosh(±0) = 1 and
 // Cosh(±Inf) = +Inf.  This is the 68881/68882 FCOSH operation.
-func (a X80) Cosh() X80 {
+func (e *Env) Cosh(a X80) X80 {
 	a = a.canonical()
 	aSig, aExp := a.frac(), a.exp()
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a)
+		return e.propagateFloatX80NaN(a, a)
 	case aExp == 0x7FFF:
 		return a.Abs()
 	case aSig == 0:
 		return X80One
 	case aExp < 0x3FFF-32: // cosh(x) = 1 + x^2/2 + ... rounds to 1
-		return approx(X80One)
+		return e.approx(X80One)
 	case aExp >= 0x3FFF+14: // overflows
-		return wOne.scale(0x10000).round()
+		return wOne.scale(0x10000).round(e)
 	}
 	x := wideFromX80(a).abs()
 	if aExp >= 0x3FFF+5 { // |x| >= 32: cosh(x) = e^|x|/2
-		return expW(x).scale(-1).round()
+		return expW(x).scale(-1).round(e)
 	}
-	e := expW(x)
-	return e.add(e.recip()).scale(-1).round()
+	ex := expW(x)
+	return ex.add(ex.recip()).scale(-1).round(e)
 }
 
 // Tanh returns the hyperbolic tangent of `a'.  Tanh(±0) = ±0 and
 // Tanh(±Inf) = ±1.  This is the 68881/68882 FTANH operation.
-func (a X80) Tanh() X80 {
+func (e *Env) Tanh(a X80) X80 {
 	a = a.canonical()
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	one := X80One
@@ -435,48 +437,48 @@ func (a X80) Tanh() X80 {
 	}
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a)
+		return e.propagateFloatX80NaN(a, a)
 	case aExp == 0x7FFF:
 		return one
 	case aSig == 0:
 		return a
 	case aExp < 0x3FFF-32: // tanh(x) = x - x^3/3 + ... rounds to x
-		return approxTiny(a)
+		return e.approxTiny(a)
 	case aExp >= 0x3FFF+5: // |x| >= 32: tanh(x) rounds to ±1
-		return approx(one)
+		return e.approx(one)
 	}
 	// tanh(x) = t/(t+2) with t = e^(2|x|) - 1
 	t := expm1W(wideFromX80(a).abs().scale(1))
 	z := t.div(t.add(wTwo))
 	z.neg = aSign
-	return z.round()
+	return z.round(e)
 }
 
 // Atanh returns the inverse hyperbolic tangent of `a'.  Atanh(±1) = ±Inf with
 // the divide-by-zero exception, and Atanh(a) for |a| > 1 is NaN with the
 // invalid exception.  This is the 68881/68882 FATANH operation.
-func (a X80) Atanh() X80 {
+func (e *Env) Atanh(a X80) X80 {
 	a = a.canonical()
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a)
+		return e.propagateFloatX80NaN(a, a)
 	case absGtOne(a):
-		Raise(ExceptionInvalid)
-		return DefaultNaN
+		e.Raise(ExceptionInvalid)
+		return e.defaultNaN()
 	case isAbsOne(a):
-		Raise(ExceptionDivbyzero)
+		e.Raise(ExceptionDivbyzero)
 		return packFloatX80(aSign, 0x7FFF, 1<<63)
 	case aSig == 0:
 		return a
 	case aExp < 0x3FFF-32: // atanh(x) = x + x^3/3 + ... rounds to x
-		return approxTiny(a)
+		return e.approxTiny(a)
 	}
 	// atanh(x) = ln((1+x)/(1-x))/2, with 1±x exact in the wide format
 	x := wideFromX80(a).abs()
 	z := lnW(wOne.add(x).div(wOne.sub(x))).scale(-1)
 	z.neg = aSign
-	return z.round()
+	return z.round(e)
 }
 
 // ---- inverse trigonometric functions ----
@@ -500,41 +502,41 @@ func atanW(x wide) wide {
 
 // Atan returns the arctangent, in radians, of `a'.  Atan(±0) = ±0 and
 // Atan(±Inf) = ±pi/2.  This is the 68881/68882 FATAN operation.
-func (a X80) Atan() X80 {
+func (e *Env) Atan(a X80) X80 {
 	a = a.canonical()
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a)
+		return e.propagateFloatX80NaN(a, a)
 	case aSig == 0:
 		return a
 	case aExp < 0x3FFF-32: // atan(x) = x - x^3/3 + ... rounds to x
-		return approxTiny(a)
+		return e.approxTiny(a)
 	}
 	z := wHalfPi
 	if aExp != 0x7FFF {
 		z = atanW(wideFromX80(a).abs())
 	}
 	z.neg = aSign
-	return z.round()
+	return z.round(e)
 }
 
 // Asin returns the arcsine, in radians, of `a'.  Asin(±0) = ±0, and Asin(a)
 // for |a| > 1 is NaN with the invalid exception.  This is the 68881/68882
 // FASIN operation.
-func (a X80) Asin() X80 {
+func (e *Env) Asin(a X80) X80 {
 	a = a.canonical()
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a)
+		return e.propagateFloatX80NaN(a, a)
 	case absGtOne(a):
-		Raise(ExceptionInvalid)
-		return DefaultNaN
+		e.Raise(ExceptionInvalid)
+		return e.defaultNaN()
 	case aSig == 0:
 		return a
 	case aExp < 0x3FFF-32: // asin(x) = x + x^3/6 + ... rounds to x
-		return approxTiny(a)
+		return e.approxTiny(a)
 	}
 	z := wHalfPi
 	if !isAbsOne(a) {
@@ -543,29 +545,29 @@ func (a X80) Asin() X80 {
 		z = atanW(x.div(wOne.sub(x).mul(wOne.add(x)).sqrt()))
 	}
 	z.neg = aSign
-	return z.round()
+	return z.round(e)
 }
 
 // Acos returns the arccosine, in radians, of `a'.  Acos(1) = +0, and Acos(a)
 // for |a| > 1 is NaN with the invalid exception.  This is the 68881/68882
 // FACOS operation.
-func (a X80) Acos() X80 {
+func (e *Env) Acos(a X80) X80 {
 	a = a.canonical()
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	switch {
 	case aExp == 0x7FFF && aSig<<1 != 0:
-		return propagateFloatX80NaN(a, a)
+		return e.propagateFloatX80NaN(a, a)
 	case absGtOne(a):
-		Raise(ExceptionInvalid)
-		return DefaultNaN
+		e.Raise(ExceptionInvalid)
+		return e.defaultNaN()
 	case isAbsOne(a) && !aSign:
 		return X80Zero
 	case isAbsOne(a):
-		return wPi.round()
+		return wPi.round(e)
 	}
 	// acos(x) = 2*atan(sqrt((1-x)/(1+x))), with 1±x exact
 	x := wideFromX80(a)
-	return atanW(wOne.sub(x).div(wOne.add(x)).sqrt()).scale(1).round()
+	return atanW(wOne.sub(x).div(wOne.add(x)).sqrt()).scale(1).round(e)
 }
 
 // ---- trigonometric functions ----
@@ -683,93 +685,94 @@ func sinCosQuadrant(a X80) (sin, cos wide) {
 
 // trigSpecial handles NaN and infinite operands of the trigonometric
 // functions.
-func trigSpecial(a X80) (z X80, done bool) {
+func (e *Env) trigSpecial(a X80) (z X80, done bool) {
 	if a.exp() != 0x7FFF {
 		return X80{}, false
 	}
 	if a.frac()<<1 != 0 {
-		return propagateFloatX80NaN(a, a), true
+		return e.propagateFloatX80NaN(a, a), true
 	}
-	Raise(ExceptionInvalid)
-	return DefaultNaN, true
+	e.Raise(ExceptionInvalid)
+	return e.defaultNaN(), true
 }
 
 // Sin returns the sine of the radian argument `a'.  Sin(±0) = ±0, and
 // Sin(±Inf) is NaN with the invalid exception.  The argument reduction is
 // accurate for all finite arguments.  This is the 68881/68882 FSIN operation.
-func (a X80) Sin() X80 {
+func (e *Env) Sin(a X80) X80 {
 	a = a.canonical()
-	if z, done := trigSpecial(a); done {
+	if z, done := e.trigSpecial(a); done {
 		return z
 	}
 	switch {
 	case a.frac() == 0:
 		return a
 	case a.exp() < 0x3FFF-32: // sin(x) = x - x^3/6 + ... rounds to x
-		return approxTiny(a)
+		return e.approxTiny(a)
 	}
 	n, r := trigReduce(a)
-	return sinCosSelect(n, r).round()
+	return sinCosSelect(n, r).round(e)
 }
 
 // Cos returns the cosine of the radian argument `a'.  Cos(±0) = 1, and
 // Cos(±Inf) is NaN with the invalid exception.  This is the 68881/68882 FCOS
 // operation.
-func (a X80) Cos() X80 {
+func (e *Env) Cos(a X80) X80 {
 	a = a.canonical()
-	if z, done := trigSpecial(a); done {
+	if z, done := e.trigSpecial(a); done {
 		return z
 	}
 	switch {
 	case a.frac() == 0:
 		return X80One
 	case a.exp() < 0x3FFF-32: // cos(x) = 1 - x^2/2 + ... rounds to 1
-		return approx(X80One)
+		return e.approx(X80One)
 	}
 	n, r := trigReduce(a)
-	return sinCosSelect(n+1, r).round() // cos(x) = sin(x + pi/2)
+	return sinCosSelect(n+1, r).round(e) // cos(x) = sin(x + pi/2)
 }
 
 // Sincos returns Sin(a) and Cos(a), computed together.  This is the
 // 68881/68882 FSINCOS operation.
-func (a X80) Sincos() (sin, cos X80) {
+func (e *Env) Sincos(a X80) (sin, cos X80) {
 	a = a.canonical()
-	if z, done := trigSpecial(a); done {
+	if z, done := e.trigSpecial(a); done {
 		return z, z
 	}
 	switch {
 	case a.frac() == 0:
 		return a, X80One
 	case a.exp() < 0x3FFF-32:
-		return approxTiny(a), X80One
+		return e.approxTiny(a), X80One
 	}
 	s, c := sinCosQuadrant(a)
 	// both results are inexact; report the exceptions once
-	raised := captureExceptions(func() { sin, cos = s.round(), c.round() })
-	Raise(raised)
+	q := e.quiet()
+	sin, cos = s.round(&q), c.round(&q)
+	e.Raise(q.Exception)
 	return sin, cos
 }
 
 // Tan returns the tangent of the radian argument `a'.  Tan(±0) = ±0, and
 // Tan(±Inf) is NaN with the invalid exception.  This is the 68881/68882 FTAN
 // operation.
-func (a X80) Tan() X80 {
+func (e *Env) Tan(a X80) X80 {
 	a = a.canonical()
-	if z, done := trigSpecial(a); done {
+	if z, done := e.trigSpecial(a); done {
 		return z
 	}
 	switch {
 	case a.frac() == 0:
 		return a
 	case a.exp() < 0x3FFF-32: // tan(x) = x + x^3/3 + ... rounds to x
-		return approxTiny(a)
+		return e.approxTiny(a)
 	}
 	n, r := trigReduce(a)
 	s, c := sinCosW(r)
 	if n&1 != 0 {
-		return c.div(s).negate().round()
+		return c.div(s).negate().round(e)
 	}
-	return s.div(c).round()
+	return s.div(c).round(e)
 }
 
 func intX80(n int) X80 {

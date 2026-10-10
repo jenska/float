@@ -30,6 +30,10 @@ jobs:
     - name: Run tests
       run: go test -v ./...
 
+    - name: Run tests with the race detector
+      if: matrix.os != 'windows-latest'
+      run: go test -race -short ./...
+
     - name: Run benchmarks
       run: go test -bench=. -benchmem -run=^$ ./...
 

@@ -42,15 +42,15 @@ func Int64ToFloatX80(a int64) X80 {
 // Float32ToFloatX80 returns the result of converting the single-precision floating-point value
 // `a' to the extended double-precision floating-point format.  The conversion
 // is exact; a signaling NaN raises the invalid exception and is quieted.
-func Float32ToFloatX80(a float32) X80 {
-	return NewFromFloat32Bits(math.Float32bits(a))
+func (e *Env) Float32ToFloatX80(a float32) X80 {
+	return e.NewFromFloat32Bits(math.Float32bits(a))
 }
 
 // Float64ToFloatX80 returns the result of converting the double-precision floating-point value
 // `a' to the extended double-precision floating-point format.  The conversion
 // is exact; a signaling NaN raises the invalid exception and is quieted.
-func Float64ToFloatX80(a float64) X80 {
-	return NewFromFloat64Bits(math.Float64bits(a))
+func (e *Env) Float64ToFloatX80(a float64) X80 {
+	return e.NewFromFloat64Bits(math.Float64bits(a))
 }
 
 // NewFromFloat32Bits converts the IEEE 754 single-precision value with bit
@@ -58,14 +58,14 @@ func Float64ToFloatX80(a float64) X80 {
 // argument, the bit pattern cannot be altered by Go's float handling, so the
 // payload and signaling state of a NaN are preserved: a signaling NaN raises
 // the invalid exception and becomes the quiet NaN with the same payload.
-func NewFromFloat32Bits(b uint32) X80 {
+func (e *Env) NewFromFloat32Bits(b uint32) X80 {
 	aSig := b & 0x007FFFFF
 	aExp := int((b >> 23) & 0xFF)
 	aSign := b>>31 != 0
 	if aExp == 0xFF {
 		if aSig != 0 {
 			if aSig&0x00400000 == 0 {
-				Raise(ExceptionInvalid)
+				e.Raise(ExceptionInvalid)
 			}
 			return packFloatX80(aSign, 0x7FFF, 0xC000000000000000|uint64(aSig)<<40)
 		}
@@ -84,14 +84,14 @@ func NewFromFloat32Bits(b uint32) X80 {
 // NewFromFloat64Bits converts the IEEE 754 double-precision value with bit
 // pattern b to the extended format, preserving NaN payloads like
 // NewFromFloat32Bits.
-func NewFromFloat64Bits(b uint64) X80 {
+func (e *Env) NewFromFloat64Bits(b uint64) X80 {
 	aSig := b & 0x000FFFFFFFFFFFFF
 	aExp := int((b >> 52) & 0x7FF)
 	aSign := b>>63 != 0
 	if aExp == 0x7FF {
 		if aSig != 0 {
 			if aSig&0x0008000000000000 == 0 {
-				Raise(ExceptionInvalid)
+				e.Raise(ExceptionInvalid)
 			}
 			return packFloatX80(aSign, 0x7FFF, 0xC000000000000000|aSig<<11)
 		}
@@ -114,7 +114,7 @@ func NewFromFloat64Bits(b uint64) X80 {
 // is rounded according to the current rounding mode.  If `a' is a NaN, the
 // largest positive integer is returned.  Otherwise, if the conversion
 // overflows, the largest integer with the same sign as `a' is returned.
-func (a X80) ToInt32() int32 {
+func (e *Env) ToInt32(a X80) int32 {
 	a = a.canonical()
 	aSig := a.frac()
 	aExp := a.exp()
@@ -127,7 +127,7 @@ func (a X80) ToInt32() int32 {
 		shiftCount = 1
 	}
 	aSig = shift64RightJamming(aSig, int16(shiftCount))
-	return roundAndPackInt32(aSign, aSig)
+	return e.roundAndPackInt32(aSign, aSig)
 }
 
 // ToInt32RoundZero returns the result of converting the extended double-precision floating-
@@ -137,14 +137,14 @@ func (a X80) ToInt32() int32 {
 // toward zero.  If `a' is a NaN, the largest positive integer is returned.
 // Otherwise, if the conversion overflows, the largest integer with the same
 // sign as `a' is returned.
-func (a X80) ToInt32RoundZero() int32 {
+func (e *Env) ToInt32RoundZero(a X80) int32 {
 	a = a.canonical()
 	aSig := a.frac()
 	aExp := a.exp()
 	aSign := a.sign()
 
 	invalid := func() int32 {
-		Raise(ExceptionInvalid)
+		e.Raise(ExceptionInvalid)
 		if aSign {
 			return math.MinInt32
 		}
@@ -158,7 +158,7 @@ func (a X80) ToInt32RoundZero() int32 {
 		return invalid()
 	} else if aExp < 0x3FFF {
 		if aExp != 0 || aSig != 0 {
-			Raise(ExceptionInexact)
+			e.Raise(ExceptionInexact)
 		}
 		return 0
 	}
@@ -173,7 +173,7 @@ func (a X80) ToInt32RoundZero() int32 {
 		return invalid()
 	}
 	if (aSig << shiftCount) != savedASig {
-		Raise(ExceptionInexact)
+		e.Raise(ExceptionInexact)
 	}
 	return z
 }
@@ -183,28 +183,29 @@ func (a X80) ToInt32RoundZero() int32 {
 // the largest positive integer is returned; if the conversion overflows the
 // largest integer with the sign of `a' is returned.  Both raise the invalid
 // exception.
-func (a X80) ToInt16() int16 {
-	return int16(a.toIntN(math.MinInt16, math.MaxInt16))
+func (e *Env) ToInt16(a X80) int16 {
+	return int16(e.toIntN(a, math.MinInt16, math.MaxInt16))
 }
 
 // ToInt8 returns the result of converting `a' to an 8-bit two's complement
 // integer, with the same rounding and overflow behavior as ToInt16.
-func (a X80) ToInt8() int8 {
-	return int8(a.toIntN(math.MinInt8, math.MaxInt8))
+func (e *Env) ToInt8(a X80) int8 {
+	return int8(e.toIntN(a, math.MinInt8, math.MaxInt8))
 }
 
-func (a X80) toIntN(lo, hi int32) int32 {
-	var z int32
-	raised := captureExceptions(func() { z = a.ToInt32() })
+func (e *Env) toIntN(a X80, lo, hi int32) int32 {
+	q := e.quiet()
+	z := q.ToInt32(a)
+	raised := q.Exception
 	if raised&ExceptionInvalid != 0 || z < lo || z > hi {
-		Raise(ExceptionInvalid)
+		e.Raise(ExceptionInvalid)
 		if z < 0 {
 			return lo
 		}
 		return hi
 	}
 	if raised != 0 {
-		Raise(raised)
+		e.Raise(raised)
 	}
 	return z
 }
@@ -216,7 +217,7 @@ func (a X80) toIntN(lo, hi int32) int32 {
 // is rounded according to the current rounding mode.  If `a' is a NaN,
 // the largest positive integer is returned.  Otherwise, if the conversion
 // overflows, the largest integer with the same sign as `a' is returned.
-func (a X80) ToInt64() int64 {
+func (e *Env) ToInt64(a X80) int64 {
 	a = a.canonical()
 	aSig := a.frac()
 	aExp := a.exp()
@@ -224,14 +225,14 @@ func (a X80) ToInt64() int64 {
 	shiftCount := 0x403E - aExp
 	aSigExtra := uint64(0)
 	if shiftCount < 0 {
-		Raise(ExceptionInvalid)
+		e.Raise(ExceptionInvalid)
 		if !aSign || (aExp == 0x7FFF && aSig != 0x8000000000000000) {
 			return math.MaxInt64
 		}
 		return math.MinInt64
 	}
 	aSig, aSigExtra = shift64ExtraRightJamming(aSig, 0, int16(shiftCount))
-	return roundAndPackInt64(aSign, aSig, aSigExtra)
+	return e.roundAndPackInt64(aSign, aSig, aSigExtra)
 }
 
 // ToInt64RoundZero returns the result of converting the extended double-precision
@@ -241,7 +242,7 @@ func (a X80) ToInt64() int64 {
 // toward zero.  If `a' is a NaN, the largest positive integer is returned.
 // Otherwise, if the conversion overflows, the largest integer with the same
 // sign as `a' is returned.
-func (a X80) ToInt64RoundZero() int64 {
+func (e *Env) ToInt64RoundZero(a X80) int64 {
 	a = a.canonical()
 	aSig := a.frac()
 	aExp := a.exp()
@@ -250,7 +251,7 @@ func (a X80) ToInt64RoundZero() int64 {
 	if 0 <= shiftCount {
 		aSig &= math.MaxInt64
 		if a.high != 0xC03E || aSig != 0 {
-			Raise(ExceptionInvalid)
+			e.Raise(ExceptionInvalid)
 			if !aSign || ((aExp == 0x7FFF) && aSig != 0) {
 				return math.MaxInt64
 			}
@@ -258,13 +259,13 @@ func (a X80) ToInt64RoundZero() int64 {
 		return math.MinInt64
 	} else if aExp < 0x3FFF {
 		if aExp != 0 || aSig != 0 {
-			Raise(ExceptionInexact)
+			e.Raise(ExceptionInexact)
 		}
 		return 0
 	}
 	z := int64(aSig >> -shiftCount)
 	if uint64(aSig<<(shiftCount&63)) != 0 {
-		Raise(ExceptionInexact)
+		e.Raise(ExceptionInexact)
 	}
 	if aSign {
 		z = -z
@@ -276,20 +277,20 @@ func (a X80) ToInt64RoundZero() int64 {
 // point value `a' to the single-precision floating-point format.  The
 // conversion is performed according to the IEC/IEEE Standard for Binary
 // Floating-Point Arithmetic.
-func (a X80) ToFloat32() float32 {
-	return math.Float32frombits(a.ToFloat32Bits())
+func (e *Env) ToFloat32(a X80) float32 {
+	return math.Float32frombits(e.ToFloat32Bits(a))
 }
 
 // ToFloat32Bits is like ToFloat32 but returns the IEEE 754 bit pattern, which
 // preserves NaN payloads: a signaling NaN raises the invalid exception and
 // becomes the quiet NaN with the top bits of the payload.
-func (a X80) ToFloat32Bits() uint32 {
+func (e *Env) ToFloat32Bits(a X80) uint32 {
 	a = a.canonical()
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	if aExp == 0x7FFF {
 		if aSig<<1 != 0 {
 			if a.IsSignalingNaN() {
-				Raise(ExceptionInvalid)
+				e.Raise(ExceptionInvalid)
 			}
 			return uint32(x1(aSign))<<31 | 0x7FC00000 | uint32(aSig<<1>>41)
 		}
@@ -299,26 +300,26 @@ func (a X80) ToFloat32Bits() uint32 {
 	if aExp != 0 || aSig != 0 {
 		aExp -= 0x3F81
 	}
-	return math.Float32bits(roundAndPackFloat32(aSign, int16(aExp), zSig))
+	return math.Float32bits(e.roundAndPackFloat32(aSign, int16(aExp), zSig))
 }
 
 // ToFloat64 returns the result of converting the extended double-precision floating-
 // point value `a' to the double-precision floating-point format.  The
 // conversion is performed according to the IEC/IEEE Standard for Binary
 // Floating-Point Arithmetic.
-func (a X80) ToFloat64() float64 {
-	return math.Float64frombits(a.ToFloat64Bits())
+func (e *Env) ToFloat64(a X80) float64 {
+	return math.Float64frombits(e.ToFloat64Bits(a))
 }
 
 // ToFloat64Bits is like ToFloat64 but returns the IEEE 754 bit pattern,
 // preserving NaN payloads like ToFloat32Bits.
-func (a X80) ToFloat64Bits() uint64 {
+func (e *Env) ToFloat64Bits(a X80) uint64 {
 	a = a.canonical()
 	aSig, aExp, aSign := a.frac(), a.exp(), a.sign()
 	if aExp == 0x7FFF {
 		if aSig<<1 != 0 {
 			if a.IsSignalingNaN() {
-				Raise(ExceptionInvalid)
+				e.Raise(ExceptionInvalid)
 			}
 			return x1(aSign)<<63 | 0x7FF8000000000000 | aSig<<1>>12
 		}
@@ -328,5 +329,5 @@ func (a X80) ToFloat64Bits() uint64 {
 	if aExp != 0 || aSig != 0 {
 		aExp -= 0x3C01
 	}
-	return math.Float64bits(roundAndPackFloat64(aSign, int16(aExp), zSig))
+	return math.Float64bits(e.roundAndPackFloat64(aSign, int16(aExp), zSig))
 }

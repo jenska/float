@@ -4,11 +4,11 @@ package float
 // equal to the corresponding value `b', and false otherwise.  The comparison is
 // performed according to the IEC/IEEE Standard for Binary Floating-Point
 // Arithmetic.
-func (a X80) Eq(b X80) bool {
+func (e *Env) Eq(a X80, b X80) bool {
 	a, b = a.canonical(), b.canonical()
 	if (a.exp() == 0x7FFF && a.frac()<<1 != 0) || (b.exp() == 0x7FFF && b.frac()<<1 != 0) {
 		if a.IsSignalingNaN() || b.IsSignalingNaN() {
-			Raise(ExceptionInvalid)
+			e.Raise(ExceptionInvalid)
 		}
 		return false
 	}
@@ -18,16 +18,16 @@ func (a X80) Eq(b X80) bool {
 // Gt returns true if the extended double-precision floating-point value `a' is greater
 // than the corresponding value `b', and false otherwise.  The invalid exception
 // is raised if either operand is a NaN.
-func (a X80) Gt(b X80) bool {
-	return b.Lt(a)
+func (e *Env) Gt(a X80, b X80) bool {
+	return e.Lt(b, a)
 }
 
 // Le returns true if the extended double-precision floating-point value `a' is less than or
 // equal to the corresponding value `b', and false otherwise.
-func (a X80) Le(b X80) bool {
+func (e *Env) Le(a X80, b X80) bool {
 	a, b = a.canonical(), b.canonical()
 	if (a.exp() == 0x7FFF && a.frac()<<1 != 0) || (b.exp() == 0x7FFF && b.frac()<<1 != 0) {
-		Raise(ExceptionInvalid)
+		e.Raise(ExceptionInvalid)
 		return false
 	}
 	aSign, bSign := a.sign(), b.sign()
@@ -43,18 +43,18 @@ func (a X80) Le(b X80) bool {
 // Ge returns true if the extended double-precision floating-point value `a' is greater than or
 // equal to the corresponding value `b', and false otherwise.  The invalid
 // exception is raised if either operand is a NaN.
-func (a X80) Ge(b X80) bool {
-	return b.Le(a)
+func (e *Env) Ge(a X80, b X80) bool {
+	return e.Le(b, a)
 }
 
 // Lt returns true if the extended double-precision floating-point value `a' is
 // less than the corresponding value `b', and false otherwise.  The comparison
 // is performed according to the IEC/IEEE Standard for Binary Floating-Point
 // Arithmetic.
-func (a X80) Lt(b X80) bool {
+func (e *Env) Lt(a X80, b X80) bool {
 	a, b = a.canonical(), b.canonical()
 	if (a.exp() == 0x7FFF && a.frac()<<1 != 0) || (b.exp() == 0x7FFF && b.frac()<<1 != 0) {
-		Raise(ExceptionInvalid)
+		e.Raise(ExceptionInvalid)
 		return false
 	}
 	aSign, bSign := a.sign(), b.sign()
@@ -71,10 +71,10 @@ func (a X80) Lt(b X80) bool {
 // to the corresponding value `b', and false otherwise.  The invalid exception is
 // raised if either operand is a NaN.  Otherwise, the comparison is performed
 // according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
-func (a X80) EqSignaling(b X80) bool {
+func (e *Env) EqSignaling(a X80, b X80) bool {
 	a, b = a.canonical(), b.canonical()
 	if (a.exp() == 0x7FFF && a.frac()<<1 != 0) || (b.exp() == 0x7FFF && b.frac()<<1 != 0) {
-		Raise(ExceptionInvalid)
+		e.Raise(ExceptionInvalid)
 		return false
 	}
 	return a.low == b.low && (a.high == b.high || (a.low == 0 && (a.high|b.high)<<1 == 0))
@@ -84,19 +84,19 @@ func (a X80) EqSignaling(b X80) bool {
 // greater than the corresponding value `b', and false otherwise.  Quiet NaNs
 // do not cause an exception.  Otherwise, the comparison is performed according
 // to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
-func (a X80) GtQuiet(b X80) bool {
-	return b.LtQuiet(a)
+func (e *Env) GtQuiet(a X80, b X80) bool {
+	return e.LtQuiet(b, a)
 }
 
 // LeQuiet returns true if the extended double-precision floating-point value `a' is less
 // than or equal to the corresponding value `b', and false otherwise.  Quiet NaNs
 // do not cause an exception.  Otherwise, the comparison is performed according
 // to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
-func (a X80) LeQuiet(b X80) bool {
+func (e *Env) LeQuiet(a X80, b X80) bool {
 	a, b = a.canonical(), b.canonical()
 	if (a.exp() == 0x7FFF && a.frac()<<1 != 0) || (b.exp() == 0x7FFF && b.frac()<<1 != 0) {
 		if a.IsSignalingNaN() || b.IsSignalingNaN() {
-			Raise(ExceptionInvalid)
+			e.Raise(ExceptionInvalid)
 		}
 		return false
 	}
@@ -114,19 +114,19 @@ func (a X80) LeQuiet(b X80) bool {
 // than or equal to the corresponding value `b', and false otherwise.  Quiet NaNs
 // do not cause an exception.  Otherwise, the comparison is performed according
 // to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
-func (a X80) GeQuiet(b X80) bool {
-	return b.LeQuiet(a)
+func (e *Env) GeQuiet(a X80, b X80) bool {
+	return e.LeQuiet(b, a)
 }
 
 // LtQuiet returns true if the extended double-precision floating-point value `a' is less
 // than the corresponding value `b', and false otherwise.  Quiet NaNs do not cause
 // an exception.  Otherwise, the comparison is performed according to the
 // IEC/IEEE Standard for Binary Floating-Point Arithmetic.
-func (a X80) LtQuiet(b X80) bool {
+func (e *Env) LtQuiet(a X80, b X80) bool {
 	a, b = a.canonical(), b.canonical()
 	if (a.exp() == 0x7FFF && a.frac()<<1 != 0) || (b.exp() == 0x7FFF && b.frac()<<1 != 0) {
 		if a.IsSignalingNaN() || b.IsSignalingNaN() {
-			Raise(ExceptionInvalid)
+			e.Raise(ExceptionInvalid)
 		}
 		return false
 	}
