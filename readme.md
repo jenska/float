@@ -8,7 +8,7 @@ This package is derived from the original SoftFloat package and was implemented 
 ## Installation
 
 ```bash
-go get github.com/jenska/float@v1.1.0
+go get github.com/jenska/float@v1.3.0
 ```
 
 ### Requirements

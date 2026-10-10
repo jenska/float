@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-10-10
 
 ### Added
 - `Env`, a floating-point environment with its own rounding mode, rounding precision, tininess detection, default NaN, exception flags and handler. Every operation that rounds or raises exceptions is also an `Env` method, so separate goroutines can compute concurrently with separate `Env`s. The X80 methods and package functions are unchanged and use the package-level settings
@@ -110,6 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[1.3.0]: https://github.com/jenska/float/releases/tag/v1.3.0
 [1.1.0]: https://github.com/jenska/float/releases/tag/v1.1.0
 [1.0.0]: https://github.com/jenska/float/releases/tag/v1.0.0
 [0.1]: https://github.com/jenska/float/releases/tag/0.1
