@@ -372,3 +372,10 @@ Exceptions are raised during operations but don't prevent execution. Operations 
 ## TODOs
 
 - add more examples
+- goroutine safety: move the floating-point state into an `Env` type, like SoftFloat's `float_status` or the 68881/68882 FPCR/FPSR
+  - `Env` holds `RoundingMode`, `RoundingPrecision`, `DetectTininess`, `DefaultNaN`, the `Exception` flags and the exception handler
+  - each rounding or exception-raising operation becomes an `Env` method, e.g. `env.Add(a, b)`, `env.Sin(a)`
+  - an `Env` belongs to one goroutine at a time; concurrent code gives each goroutine its own
+  - backward compatible (v1.x): the current package-level variables become a default `Env`, and `a.Add(b)` calls `defaultEnv.Add(a, b)`; this API stays non-goroutine-safe
+  - internally, `Trunc` and `captureExceptions` must stop temporarily changing shared state
+  - add a `-race` test that runs operations with different rounding modes in parallel
